@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import random
 from wiki_func import *
-from Data_collection import *
+from ToG.Data_collection import *
 from utils import *
 
 
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     
     datas, question_string = prepare_dataset(args['dataset'])
     print(f"Start Running ToG on {args['dataset']} dataset.")
-    for data in tqdm(datas[2:3]):
+    for data in tqdm(datas[0:4]):
         question = data[question_string]
         print(f'Question:\n{question}\n')
         topic_entity = data['qid_topic_entity']
