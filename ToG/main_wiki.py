@@ -9,7 +9,7 @@ if __name__ == '__main__':
     
     args = {'dataset' : 'cwq',
             'max_length' : 256, # the max length of LLMs output
-            'temperature_exploration' : 0.4, # the temperature in exploration stage
+            'temperature_exploration' : 0, # the temperature in exploration stage
             'temperature_reasoning' : 0, # the temperature in reasoning stage
             'width' : 3, # choose the search width of ToG
             'depth' : 3, # choose the search depth of ToG
