@@ -11,9 +11,7 @@ def transform_relation(relation):
     return relation_without_prefix
 
 def clean_sub_questions(result):
-    sub_questions = re.findall(r'Step \d+: (.*?\?)', result)
-    # Print the extracted questions
-    print(sub_questions)
+    sub_questions = re.findall(r'\**[Ss]tep \d+\**: (.*?\?)', result)
     return True, sub_questions
 
 def clean_relations(string, entity_id):
@@ -168,17 +166,18 @@ def update_history(entity_candidates, entity, scores, entity_candidates_id, tota
 
 
 def half_stop(question, cluster_chain_of_entities, depth, args, llm_logger, session_key):
-    print("No new knowledge added during search depth %d, stop searching." % depth)
     llm_logger.debug("No new knowledge added during search depth %d, stop searching." % depth, extra={'session_key': session_key})
-    answer = generate_answer(question, cluster_chain_of_entities, args)
+    answer = generate_answer(question, cluster_chain_of_entities, args, llm_logger, session_key)
     save_2_json(question, answer, cluster_chain_of_entities, file_name=args['dataset'])
 
 
-def generate_answer(question, cluster_chain_of_entities, args): 
+def generate_answer(question, cluster_chain_of_entities, args, llm_logger, session_key): 
     prompt = answer_prompt_wiki + question + '\n'
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
+    llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
     result = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
+    llm_logger.debug(f"Final answer:{result}", extra={'session_key': session_key})
     return result
 
 
