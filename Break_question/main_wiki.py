@@ -63,6 +63,8 @@ if __name__ == '__main__':
             paths.append(temp)
         main_logger.debug(f'Paths:\n{paths}', extra={'session_key': session_key})
         for path in paths:
+            if len(path) == 0:
+                continue
         # while(step < args['depth'] and step < len(paths)-1):
             for step, stage in enumerate(path):
                 main_logger.debug(f'step:{step}', extra={'session_key': session_key})
