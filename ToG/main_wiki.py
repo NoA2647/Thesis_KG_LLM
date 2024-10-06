@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import random
 from wiki_func import *
-from ToG.Data_collection import *
+from Data_collection import *
 from utils import *
 
 
