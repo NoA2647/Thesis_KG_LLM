@@ -111,8 +111,9 @@ def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="llama3"):
         )  
         # engine = openai.Model.list()["data"][0]["id"]
     else:
-        pass
-        # openai.api_key = opeani_api_keys
+        client = OpenAI(
+            api_key=opeani_api_keys,
+        )  
 
     messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
     message_prompt = {"role":"user","content":prompt}

@@ -1,6 +1,8 @@
 import logging
 from tqdm import tqdm
 import random
+from dotenv import load_dotenv
+import os
 from wiki_func import *
 from Data_collection import *
 from utils import *
@@ -22,7 +24,9 @@ if __name__ == '__main__':
     llm_handler.setFormatter(llm_formatter)
     llm_logger.addHandler(llm_handler)
     llm_logger.setLevel(logging.DEBUG)
-    
+
+    load_dotenv()
+
     args = {'dataset' : 'cwq',
             'max_length' : 256, # the max length of LLMs output
             'temperature_exploration' : 0, # the temperature in exploration stage
@@ -30,14 +34,14 @@ if __name__ == '__main__':
             'width' : 3, # choose the search width of ToG
             'depth' : 3, # choose the search depth of ToG
             'remove_unnecessary_rel' : True, # whether removing unnecessary relations
-            'LLM_type' : 'llama3.1', # LLM Type
-            'opeani_api_keys' : "", # if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys
+            'LLM_type' : 'gpt-3.5-turbo', # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
+            'opeani_api_keys' : os.getenv("OPENAI_API_KEY"), # if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys
             'num_retain_entity' : 5, # Number of entities retained during entities search
             'prune_tools' : 'llm'}
     
     datas, question_string = prepare_dataset(args['dataset'])
     print(f"Start Running ToG on {args['dataset']} dataset.")
-    for data in tqdm([datas[2], datas[19]]): # 19&2
+    for data in tqdm([datas[19]]): # 19&2
         session_key = str(uuid.uuid4())
         question = data[question_string]
         main_logger.debug(f'Main Question:\n{question}', extra={'session_key': session_key})
