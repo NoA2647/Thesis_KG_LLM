@@ -21,6 +21,25 @@ Now the main question:
 "%s" with initial node: "%s"
 """
 
+break_question_propmt2='''
+Assume I have the current node "%s" and I already know the information about this node so don't ask about this node. Break down the question "%s" into multi-hop sub-questions, starting from the current node.
+
+Here’s an example of the expected output format:
+
+Example Question:
+"What is the predominant religion where the leader is Ovadia Yosef?" with current node: "Ovadia Yosef"
+
+Example Answer:
+Step 1: What religious or spiritual role did Ovadia Yosef hold?
+(Determine Ovadia Yosef's religious position, such as whether he was a religious leader, scholar, or figure in a specific faith.)
+
+Step 2: What is the predominant religion associated with Ovadia Yosef's leadership?
+(Identify the religion in which Ovadia Yosef was a leader, determining the community or faith group he influenced.)
+
+Now, for the main question:
+"%s" with current node: "%s"
+'''
+
 extract_relation_prompt = """Please retrieve %s relations (separated by semicolon) that contribute to the question and rate their contribution on a scale from 0 to 1 (the sum of the scores of %s relations is 1).
 Q: Name the president of the country whose main spoken language was Brahui in 1980?
 Topic Entity: Brahui Language
