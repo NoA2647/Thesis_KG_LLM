@@ -26,15 +26,15 @@ if __name__ == '__main__':
     llm_logger.setLevel(logging.DEBUG)
 
     load_dotenv()
-
+    
     args = {'dataset' : 'cwq',
             'max_length' : 256, # the max length of LLMs output
             'temperature_exploration' : 0, # the temperature in exploration stage
             'temperature_reasoning' : 0, # the temperature in reasoning stage
-            'width' : 3, # choose the search width of ToG
+            'width' : 1, # choose the search width of ToG
             'depth' : 3, # choose the search depth of ToG
             'remove_unnecessary_rel' : True, # whether removing unnecessary relations
-            'LLM_type' : 'gpt-3.5-turbo', # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
+            'LLM_type' : 'gpt-4o-mini', # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
             'opeani_api_keys' : os.getenv("OPENAI_API_KEY"), # if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys
             'num_retain_entity' : 5, # Number of entities retained during entities search
             'prune_tools' : 'llm'}
@@ -121,17 +121,17 @@ if __name__ == '__main__':
                     # main_logger.debug(f'Scores: {scores}', extra={'session_key': session_key})
                     # total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head = update_history(entity_candidates, entity, scores, entity_candidates_id, total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head, value_flag)
             
-                if len(total_candidates) == 0:
-                    half_stop(question, cluster_chain_of_entities, step, args, llm_logger, session_key)
-                    flag_printed = True
-                    break
+                # if len(total_candidates) == 0:
+                #     half_stop(question, cluster_chain_of_entities, step, args, llm_logger, session_key)
+                #     flag_printed = True
+                #     break
                 
                 main_logger.debug('Entity Prune ...', extra={'session_key': session_key})
                 flag, chain_of_entities, entities_id, pre_relations, pre_heads = entity_prune(
-                    [item['entity'] for item in current_entity_relations_list],
-                    [item['relation'] for item in current_entity_relations_list],
-                    [item['entity'] for item in current_entity_relations_list],
-                    [item['entity'] for item in current_entity_relations_list],
+                    [item['entity_candidates_id'] for item in current_entity_relations_list],
+                    [item['relation_label'] for item in current_entity_relations_list],
+                    [item['entity_candidates_label'] for item in current_entity_relations_list],
+                    [item['topic_entity_id'] for item in current_entity_relations_list],
                     [1] * len(current_entity_relations_list),  # Assuming head = 1 for all
                     [item['score'] for item in current_entity_relations_list],
                     args,

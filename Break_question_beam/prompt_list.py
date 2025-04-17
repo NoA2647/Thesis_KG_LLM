@@ -258,8 +258,7 @@ Fort Worth Convention Center, located in the administrative territorial entity, 
 Fort Worth Convention Center, occupant, San Antonio Spurs
 A: Based on the given knowledge triplets and my knowledge, Mychal George Thompson played home games with the San Antonio Spurs at the AT&T Center. Therefore, the answer to the question is {AT&T Center}.
 
-Q: {}
-"""
+Q: """
 
 cot_prompt = """Q: What state is home to the university that is represented in sports by George Washington Colonials men's basketball?
 A: First, the education institution has a sports team named George Washington Colonials men's basketball in is George Washington University , Second, George Washington University is in Washington D.C. The answer is {Washington, D.C.}.
