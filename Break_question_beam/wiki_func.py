@@ -36,32 +36,37 @@ def clean_relations(string, entity_id):
     return True, relations
 
 # Clean the relation-entity results:
-def clean_relation_entity_pairs(result, entity_id):
+def clean_relation_entity_pairs(result, entity_id, relation_entity_pairs):
     result = result.replace("**", "")
-    pattern = r'(?P<relation>[\w_]+)\s*--\s*(?P<entity>[\w_ ]+):\s*(?P<sentence>.*?)\s*Score:\s*(?P<score>\d+\.\d+)'
-
+    pattern = r'(?P<relation_label>[\w_]+)\s*--\s*(?P<entity_candidates_label>[\w_ .]+):\s*(?P<sentence>.*?)\s*Score:\s*(?P<score>\d+\.\d+)'
+    entity_candidates_id = None
     scored_pairs = []
     for match in re.finditer(pattern, result):
-        relation = match.group("relation").strip()
-        entity = match.group("entity").strip()
+        relation_label = match.group("relation_label").strip()
+        entity_candidates_label = match.group("entity_candidates_label").strip()
         
         # Handle the score safely
         score_str = match.group("score")
         score = float(score_str) if score_str else 0.0
-
-        scored_pairs.append({"entity": entity_id, "relation": relation, "entity": entity, "score": score})
+        for l in relation_entity_pairs:
+            for candidate_name, candidate_id in zip(l['entity_candidates_label'], l['entity_candidates_id']):
+                if entity_candidates_label == candidate_name.replace(" ","_"):
+                    entity_candidates_id = candidate_id
+                    entity_candidates_label = candidate_name
+        scored_pairs.append({"topic_entity_id": entity_id, "relation_label": relation_label, "entity_candidates_id":entity_candidates_id, "entity_candidates_label": entity_candidates_label, "score": score})
     return bool(scored_pairs), scored_pairs
-    
+
 
 def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs, args):
     result = ""
     idx = 1
     for pair in relation_entity_pairs:
-        for candidate_name in pair['entity_candidates_name']:
-            result += f"{idx}. {pair['relation_label'].replace(' ', '_')} -- {candidate_name.replace(' ', '_')}\n"
-            idx += 1
+        for candidate_name, candidate_id in zip(pair['entity_candidates_label'], pair['entity_candidates_id']):
+            if candidate_id != None:
+                result += f"{idx}. {pair['relation_label'].replace(' ', '_')} -- {candidate_name.replace(' ', '_')}\n"
+                idx += 1
             
-    prompt_str = extract_relation_entity_prompt %(entity_name, args['width'], question, result) 
+    prompt_str = extract_relation_entity_prompt %(entity_name, max(3,args['width']), question, result) 
     
     return prompt_str
 
@@ -105,10 +110,10 @@ def relation_entity_search_prune(entity_id, entity_name, pre_relations, question
         entity_candidates_id, entity_candidates_name = entity_search(entity_id, relation, wiki_client)
         if entity_candidates_name:
             relation_entity_pairs.append({
-                'entity': entity_id,
+                'topic_entity_id': entity_id,
                 'relation_label': relation,
                 'entity_candidates_id': entity_candidates_id,
-                'entity_candidates_name': entity_candidates_name
+                'entity_candidates_label': entity_candidates_name
             })
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}', extra={'session_key': session_key})
     # Now we prompt the LLM to prune and score these relation-entity pairs
@@ -117,7 +122,7 @@ def relation_entity_search_prune(entity_id, entity_name, pre_relations, question
     result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
-    flag, scored_pairs = clean_relation_entity_pairs(result, entity_id)
+    flag, scored_pairs = clean_relation_entity_pairs(result, entity_id, relation_entity_pairs)
     return scored_pairs if flag else []
 
 
