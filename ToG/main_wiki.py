@@ -14,14 +14,14 @@ if __name__ == '__main__':
             'width' : 3, # choose the search width of ToG
             'depth' : 3, # choose the search depth of ToG
             'remove_unnecessary_rel' : True, # whether removing unnecessary relations
-            'LLM_type' : 'llama3.1', # LLM Type
-            'opeani_api_keys' : "", # if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys
+            'LLM_type' : 'gpt-4o-mini', # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
+            'opeani_api_keys' : os.getenv("OPENAI_API_KEY"), # if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys
             'num_retain_entity' : 5, # Number of entities retained during entities search
             'prune_tools' : 'llm'}
     
     datas, question_string = prepare_dataset(args['dataset'])
     print(f"Start Running ToG on {args['dataset']} dataset.")
-    for data in tqdm(datas[0:4]):
+    for data in tqdm([datas[19]]):
         question = data[question_string]
         print(f'Question:\n{question}\n')
         topic_entity = data['qid_topic_entity']
