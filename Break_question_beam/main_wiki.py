@@ -31,7 +31,7 @@ if __name__ == '__main__':
             'max_length' : 256, # the max length of LLMs output
             'temperature_exploration' : 0, # the temperature in exploration stage
             'temperature_reasoning' : 0, # the temperature in reasoning stage
-            'width' : 1, # choose the search width of ToG
+            'width' : 3, # choose the search width of ToG
             'depth' : 3, # choose the search depth of ToG
             'remove_unnecessary_rel' : True, # whether removing unnecessary relations
             'LLM_type' : 'gpt-4o-mini', # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
@@ -45,6 +45,7 @@ if __name__ == '__main__':
         session_key = str(uuid.uuid4())
         question = data[question_string]
         main_logger.debug(f'Main Question:\n{question}', extra={'session_key': session_key})
+        # temperory for testing just one topic entity
         topic_entity = data['qid_topic_entity']
         cluster_chain_of_entities = []
         if len(topic_entity) == 0:
@@ -52,35 +53,47 @@ if __name__ == '__main__':
             results = generate_without_explored_paths(question, args) 
             save_2_json(question, results, [], file_name=args['dataset'])
             continue
+        # check to remove
         pre_relations = []
+        # check to remove
         pre_heads= [-1] * len(topic_entity)
         flag_printed = False
         wiki_client = WikiDataB()
         paths = []
+        next_topic_entities = []
+        # just for test, remember to delete
+        topic_entity = {"Q9696": "John F. Kennedy"}
         for entity in topic_entity:
+            next_topic_entities.append({'current_ent_qid':entity, 'current_ent_label':topic_entity[entity]})
             sub_questions = break_question(question, topic_entity[entity], args, llm_logger, session_key)
-            temp = []
-            for sub_question in sub_questions:
-                temp.append({'current_ent_qid':entity, 
-                             'current_ent_label':topic_entity[entity], 
-                             'current_sub_question': sub_question})
-            paths.append(temp)
+            # temp = []
+            # for sub_question in sub_questions:
+            #     temp.append({'current_ent_qid':entity, 
+            #                  'current_ent_label':topic_entity[entity], 
+            #                  'current_sub_question': sub_question})
+            paths.append(sub_questions)
         main_logger.debug(f'Paths:\n{paths}', extra={'session_key': session_key})
         for path in paths:
             if len(path) == 0:
                 continue
         # while(step < args['depth'] and step < len(paths)-1):
-            for step, stage in enumerate(path):
+            for step, sub_question in enumerate(path):
                 main_logger.debug(f'step:{step}', extra={'session_key': session_key})
-                current_entity_relations_list = []
-                sub_question = stage['current_sub_question']
-                entity_qid = stage['current_ent_qid']
-                entity_label = stage['current_ent_label']
-                if entity_qid!="[FINISH_ID]":
-                    main_logger.debug(f'Relation Prune ...', extra={'session_key': session_key})
-                    retrieve_relations_with_scores = relation_entity_search_prune(entity_qid, entity_label, pre_relations, sub_question, args, wiki_client, llm_logger, session_key)  # best entity triplet, entitiy_id
-                    current_entity_relations_list.extend(retrieve_relations_with_scores)
-                    main_logger.debug(f'Relations:\n{current_entity_relations_list}', extra={'session_key': session_key})
+                current_TE_R_CE_list = []
+                # TE -> topic entity
+                # R -> relation
+                # CE -> candidate entity
+                for TE in next_topic_entities:
+                    entity_qid = TE['current_ent_qid']
+                    entity_label = TE['current_ent_label']
+                    if entity_qid!="[FINISH_ID]":
+                        main_logger.debug(f"Relation Prune for \'{entity_label}\' ...", extra={'session_key': session_key})
+                        # extract all TE_R_CE
+                        relation_entity_pairs = retrieve_relation_entity_pairs(entity_qid, pre_relations, args, wiki_client, llm_logger, session_key)
+                        # choose top n TE_R_CE
+                        retrieve_relations_with_scores = relation_entity_search_prune(entity_qid, entity_label, sub_question, relation_entity_pairs, args, llm_logger, session_key)
+                        current_TE_R_CE_list.extend(retrieve_relations_with_scores)
+                main_logger.debug(f'current_TE_R_CE_list:\n{current_TE_R_CE_list}', extra={'session_key': session_key})
                 total_candidates = []
                 total_scores = []
                 total_relations = []
@@ -89,11 +102,11 @@ if __name__ == '__main__':
                 total_head = []
 
                 # new 
-                if not current_entity_relations_list:
+                if not current_TE_R_CE_list:
                     half_stop(question, cluster_chain_of_entities, step, args, llm_logger, session_key)
                     flag_printed = True
                     break
-    
+
                 # for entity in current_entity_relations_list:
                 #     value_flag=False
                     # temp = entity['relation_label']
@@ -126,24 +139,24 @@ if __name__ == '__main__':
                 #     flag_printed = True
                 #     break
                 
-                main_logger.debug('Entity Prune ...', extra={'session_key': session_key})
+                main_logger.debug('Walk Prune ...', extra={'session_key': session_key})
+                # score N^2 TE_R_CE(walk)
+                flag, pruned_TE_R_CE_list = te_r_ce_score(current_TE_R_CE_list, sub_question, args, llm_logger, session_key)
+                # prune walks base on beam search
                 flag, chain_of_entities, entities_id, pre_relations, pre_heads = entity_prune(
-                    [item['entity_candidates_id'] for item in current_entity_relations_list],
-                    [item['relation_label'] for item in current_entity_relations_list],
-                    [item['entity_candidates_label'] for item in current_entity_relations_list],
-                    [item['topic_entity_id'] for item in current_entity_relations_list],
-                    [1] * len(current_entity_relations_list),  # Assuming head = 1 for all
-                    [item['score'] for item in current_entity_relations_list],
-                    args,
-                    wiki_client
+                    [item['entity_candidate_id'] for item in pruned_TE_R_CE_list],
+                    [item['relation_label'] for item in pruned_TE_R_CE_list],
+                    [item['entity_candidate_label'] for item in pruned_TE_R_CE_list],
+                    [item['topic_entity_id'] for item in pruned_TE_R_CE_list],
+                    [item['topic_entity_label'] for item in pruned_TE_R_CE_list],
+                    [1] * len(pruned_TE_R_CE_list),  # Assuming head = 1 for all
+                    [item['score'] for item in pruned_TE_R_CE_list],
+                    args
                 )
 
                 cluster_chain_of_entities.append(chain_of_entities)
                 main_logger.debug(f'cluster chain of entities:\n{cluster_chain_of_entities}', extra={'session_key': session_key})
-                next_topic_entity = {qid: topic for qid, topic in zip(entities_id, [wiki_client.qid2label(entity) for entity in entities_id])}
-                if step+1 < len(path):
-                    path[step+1]['current_ent_qid'] = list(next_topic_entity.keys())[0]
-                    path[step+1]['current_ent_label'] = list(next_topic_entity.values())[0]
+                next_topic_entities = [{'current_ent_qid':qid, 'current_ent_label':topic} for qid, topic in zip(entities_id, [wiki_client.qid2label(entity) for entity in entities_id])]
                 if flag:
                     pass
                     # print('Reasoning ...')
