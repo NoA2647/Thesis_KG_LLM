@@ -40,6 +40,12 @@ Now, for the main question:
 "%s" with current node: "%s"
 '''
 
+score_te_r_ce_prompt = """
+I'm walking on a knowledge graph with the following entity-relation-entity triplets. Please score all of these triplets base on contributation to answering the question "%s", in the following format <entity> -- <relation> -- <entity>: <sentences> Score:<score>. The sum of the scores should be 1.
+Entity-Relation-Entity triplets:
+%s
+"""
+
 # current_node, retrival_number, question, realtion-entity pairs 
 extract_relation_entity_prompt = """
 I have a knowledge graph with node "%s" and the following relation-entity pairs. Please retrieve %s of the relations that contribute to answering the question "%s", and provide the answer in the format <relation> -- <entity>: <sentences> Score:<score>. The sum of the scores of the relevant relations should be 1.
