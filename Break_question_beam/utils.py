@@ -103,38 +103,50 @@ def if_all_zero(topn_scores):
 #     return True, relations
 
 
-def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="llama3"):
+def run_llm(
+    prompt: str,
+    temperature: float,
+    max_tokens: int,
+    openai_api_keys: str,
+    engine: str = "llama3",
+    system_prompt: str = "You are an AI assistant that helps people find information.",
+    frequency_penalty: float = 0.0,
+    presence_penalty: float = 0.0,
+    retries: int = 3,
+    retry_delay: int = 2
+) -> str:
+    
     if "llama" in engine.lower():
         client = OpenAI(
-            base_url = 'http://localhost:11434/v1', # your local llama server port
+            base_url='http://localhost:11434/v1',
             api_key='EMPTY',
-        )  
-        # engine = openai.Model.list()["data"][0]["id"]
+        )
     else:
         client = OpenAI(
-            api_key=opeani_api_keys,
-        )  
+            api_key=openai_api_keys,
+        )
 
-    messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
-    message_prompt = {"role":"user","content":prompt}
-    messages.append(message_prompt)
-    f = 0
-    while(f == 0):
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt}
+    ]
+
+    for attempt in range(retries):
         try:
             response = client.chat.completions.create(
-                    model=engine,
-                    messages = messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    frequency_penalty=0,
-                    presence_penalty=0)
-            result = response.choices[0].message.content
-            f = 1
+                model=engine,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                frequency_penalty=frequency_penalty,
+                presence_penalty=presence_penalty
+            )
+            return response.choices[0].message.content
         except Exception as e:
-            print(e)
-            print("openai error, retry")
-            time.sleep(2)
-    return result
+            print(f"Attempt {attempt + 1} failed: {e}")
+            time.sleep(retry_delay)
+
+    raise RuntimeError("All retry attempts failed.")
 
     
 def all_unknown_entity(entity_candidates):
