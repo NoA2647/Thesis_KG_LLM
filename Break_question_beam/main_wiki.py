@@ -28,7 +28,7 @@ if __name__ == '__main__':
     load_dotenv()
     
     args = {'dataset' : 'cwq',
-            'max_length' : 256, # the max length of LLMs output
+            'max_length' : 1024, # the max length of LLMs output
             'temperature_exploration' : 0, # the temperature in exploration stage
             'temperature_reasoning' : 0, # the temperature in reasoning stage
             'width' : 3, # choose the search width of ToG
