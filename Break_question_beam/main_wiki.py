@@ -7,6 +7,7 @@ from wiki_func import *
 from Data_collection import *
 from utils import *
 import uuid
+from kg_path_walker_class import KGPathWalker
 
 if __name__ == '__main__':
     
@@ -47,7 +48,6 @@ if __name__ == '__main__':
         main_logger.debug(f'Main Question:\n{question}', extra={'session_key': session_key})
         # temperory for testing just one topic entity
         topic_entity = data['qid_topic_entity']
-        cluster_chain_of_entities = []
         if len(topic_entity) == 0:
             ## need change
             results = generate_without_explored_paths(question, args) 
@@ -63,15 +63,13 @@ if __name__ == '__main__':
         next_topic_entities = []
         # just for test, remember to delete
         topic_entity = {"Q9696": "John F. Kennedy"}
+        initials = []
         for entity in topic_entity:
             next_topic_entities.append({'current_ent_qid':entity, 'current_ent_label':topic_entity[entity]})
             sub_questions = break_question(question, topic_entity[entity], args, llm_logger, session_key)
-            # temp = []
-            # for sub_question in sub_questions:
-            #     temp.append({'current_ent_qid':entity, 
-            #                  'current_ent_label':topic_entity[entity], 
-            #                  'current_sub_question': sub_question})
             paths.append(sub_questions)
+            initials.append(topic_entity[entity])
+        walker = KGPathWalker(root_entities=initials, scoring_mode="mul")
         main_logger.debug(f'Paths:\n{paths}', extra={'session_key': session_key})
         for path in paths:
             if len(path) == 0:
@@ -103,7 +101,7 @@ if __name__ == '__main__':
 
                 # new 
                 if not current_TE_R_CE_list:
-                    half_stop(question, cluster_chain_of_entities, step, args, llm_logger, session_key)
+                    half_stop(question, walker, step, args, llm_logger, session_key)
                     flag_printed = True
                     break
 
@@ -154,8 +152,8 @@ if __name__ == '__main__':
                     args
                 )
 
-                cluster_chain_of_entities.append(chain_of_entities)
-                main_logger.debug(f'cluster chain of entities:\n{cluster_chain_of_entities}', extra={'session_key': session_key})
+                walker.extend_paths(chain_of_entities)
+                main_logger.debug(f'cluster chain of entities:\n{walker.print_paths()}', extra={'session_key': session_key})
                 next_topic_entities = [{'current_ent_qid':qid, 'current_ent_label':topic} for qid, topic in zip(entities_id, [wiki_client.qid2label(entity) for entity in entities_id])]
                 if flag:
                     pass
@@ -177,15 +175,15 @@ if __name__ == '__main__':
                     #         topic_entity = {qid: topic for qid, topic in zip(entities_id, [wiki_client.qid2label(entity) for entity in entities_id])}
                     #         continue
                 else:
-                    half_stop(question, cluster_chain_of_entities, step, args, llm_logger, session_key)
+                    half_stop(question, walker, step, args, llm_logger, session_key)
                     flag_printed = True
                     
             main_logger.debug('Reasoning ...', extra={'session_key': session_key})
-            stop, results = reasoning(question, cluster_chain_of_entities, args, llm_logger, session_key)
+            stop, results = reasoning(question, walker, args, llm_logger, session_key)
             main_logger.debug(f'Stop:\n{stop}\nReasoning:\n{results}', extra={'session_key': session_key})
             if stop:
                 main_logger.debug("ToG stoped", extra={'session_key': session_key})
-                save_2_json(question, results, cluster_chain_of_entities, file_name=args['dataset'])
+                save_2_json(question, results, walker, file_name=args['dataset'])
                 flag_printed = True
                 break
             else:
