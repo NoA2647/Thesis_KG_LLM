@@ -170,8 +170,8 @@ def clean_scores(string, entity_candidates):
         return [1/len(entity_candidates)] * len(entity_candidates)
     
 
-def save_2_json(question, answer, cluster_chain_of_entities, file_name):
-    dict = {"question":question, "results": answer, "reasoning_chains": cluster_chain_of_entities}
+def save_2_json(question, answer, walker, file_name):
+    dict = {"question":question, "results": answer, "reasoning_chains": walker.print_paths() if walker is not list else []}
     with open("ToG_{}.json".format(file_name), "a") as outfile:
         json_str = json.dumps(dict)
         outfile.write(json_str + "\n")

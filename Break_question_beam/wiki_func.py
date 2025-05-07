@@ -284,16 +284,15 @@ def update_history(entity_candidates, entity, scores, entity_candidates_id, tota
     return total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head
 
 
-def half_stop(question, cluster_chain_of_entities, depth, args, llm_logger, session_key):
+def half_stop(question, walker, depth, args, llm_logger, session_key):
     llm_logger.debug("No new knowledge added during search depth %d, stop searching." % depth, extra={'session_key': session_key})
-    answer = generate_answer(question, cluster_chain_of_entities, args, llm_logger, session_key)
-    save_2_json(question, answer, cluster_chain_of_entities, file_name=args['dataset'])
+    answer = generate_answer(question, walker, args, llm_logger, session_key)
+    save_2_json(question, answer, walker, file_name=args['dataset'])
 
 
-def generate_answer(question, cluster_chain_of_entities, args, llm_logger, session_key): 
+def generate_answer(question, walker, args, llm_logger, session_key): 
     prompt = answer_prompt_wiki + question + '\n'
-    chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
-    prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
+    prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
     result = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f"Final answer:{result}", extra={'session_key': session_key})
@@ -311,14 +310,13 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
     if len(filtered_list) ==0:
         return False, [], [], [], []
     entities_id, relations, candidates, tops, topls, heads, scores = map(list, zip(*filtered_list))
-    cluster_chain_of_entities = [(topls[i], relations[i], candidates[i]) for i in range(len(candidates))]
+    cluster_chain_of_entities = [(topls[i], relations[i], candidates[i], scores[i]) for i in range(len(candidates))]
     return True, cluster_chain_of_entities, entities_id, relations, heads
 
 
-def reasoning(question, cluster_chain_of_entities, args, llm_logger, session_key):
+def reasoning(question, walker, args, llm_logger, session_key):
     prompt = prompt_evaluate_wiki + question
-    chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
-    prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
+    prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f'reasoning prompt:\n{prompt}', extra={'session_key': session_key})
     response = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
