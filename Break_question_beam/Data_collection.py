@@ -43,6 +43,7 @@ class WikiDataB():
     def __init__(self):
         self.root = "https://www.wikidata.org/wiki/"
         self.database = './Graph/'
+        os.makedirs(self.database, exist_ok=True)
 
     def get_entity_info(self, entity_qid:str):
         path = self.database + entity_qid+'.json'

@@ -40,7 +40,7 @@ def construct_relation_prune_prompt(question, entity_name, total_relations, args
     return extract_relation_prompt_wiki % (args['width'], args['width'])+question+'\nTopic Entity: '+entity_name+ '\nRelations:\n'+'\n'.join([f"{i}. wiki.relation.{item.replace(' ', '_')}" for i, item in enumerate(total_relations, start=1)])+'\nA:'
 
 def construct_break_question_prompt(question, entity_name):
-    return break_question_propmt2 % (entity_name, question, question, entity_name)
+    return break_question_propmt_v2 % (entity_name, question, question, entity_name)
 
 
 def check_end_word(s):
