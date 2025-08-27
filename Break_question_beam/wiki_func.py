@@ -10,30 +10,10 @@ def transform_relation(relation):
     relation_without_prefix = relation.replace("wiki.relation.", "").replace("_", " ")
     return relation_without_prefix
 
+
 def clean_sub_questions(result):
     sub_questions = re.findall(r'\**[Ss]tep \d+:\** (.*?\?)', result)
     return True, sub_questions
-
-def clean_relations(string, entity_id):
-    pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
-    relations=[]
-    for match in re.finditer(pattern, string):
-        relation = match.group("relation").strip()
-        relation = transform_relation(relation)
-        if ';' in relation:
-            continue
-        score = match.group("score")
-        if not relation or not score:
-            return False, "output uncompleted.."
-        try:
-            score = float(score)
-        except ValueError:
-            return False, "Invalid score"
-
-        relations.append({"entity": entity_id, "relation_label": relation, "score": score})
-    if not relations:
-        return False, "No relations found"
-    return True, relations
 
 # Clean the relation-entity results:
 def clean_relation_entity_pairs(result, entity_id, relation_entity_pairs):
@@ -70,11 +50,9 @@ def construct_relation_entity_prune_prompt(question, entity_name, relation_entit
     
     return prompt_str
 
-def construct_relation_prune_prompt(question, entity_name, total_relations, args):
-    return extract_relation_prompt_wiki % (args['width'], args['width'])+question+'\nTopic Entity: '+entity_name+ '\nRelations:\n'+'\n'.join([f"{i}. wiki.relation.{item.replace(' ', '_')}" for i, item in enumerate(total_relations, start=1)])+'\nA:'
 
 def construct_break_question_prompt(question, entity_name):
-    return break_question_propmt2 % (entity_name, question, question, entity_name)
+    return break_question_propmt_v2 % (entity_name, question, question, entity_name)
 
 
 def check_end_word(s):
@@ -88,9 +66,6 @@ def abandon_rels(relation):
         return True
     return False
 
-
-def construct_entity_score_prompt(question, relation, entity_candidates):
-    return score_entity_candidates_prompt_wiki.format(question, relation) + "; ".join(entity_candidates) + '\nScore: '
 
 def relation_entity_search_prune(entity_id, entity_name, pre_relations, question, args, wiki_client, llm_logger, session_key):
     # Retrieve all relations for the current entity
@@ -137,6 +112,7 @@ def break_question(question, entity_name, args, llm_logger, session_key):
         return sub_questions
     else:
         return []
+
 
 def relation_search_prune(entity_id, entity_name, pre_relations, question, args, wiki_client, llm_logger, session_key):
     relations = wiki_client.get_all_relations_of_an_entity(entity_id)
@@ -194,30 +170,6 @@ def entity_search(entity_qid, relation_label, wiki_client):
     return id_list, name_list
 
 
-def entity_score(question, entity_candidates_id, entity_candidates, score, relation_label, args, llm_logger, session_key):
-    if len(entity_candidates) == 1:
-        return [score], entity_candidates, entity_candidates_id
-    if len(entity_candidates) == 0:
-        return [0.0], entity_candidates, entity_candidates_id
-    
-    # make sure the id and entity are in the same order
-    zipped_lists = sorted(zip(entity_candidates, entity_candidates_id))
-    entity_candidates, entity_candidates_id = zip(*zipped_lists)
-    entity_candidates = list(entity_candidates)
-    entity_candidates_id = list(entity_candidates_id)
-
-    prompt = construct_entity_score_prompt(question, relation_label, entity_candidates)
-    llm_logger.debug(f'prompt entity:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
-    llm_logger.debug(f'raw result for \'{relation_label}\':\n{result}', extra={'session_key': session_key})
-    entity_scores = clean_scores(result, entity_candidates)
-    llm_logger.debug(f'clean_entity_scores:\n{entity_scores}', extra={'session_key': session_key})
-    if all_zero(entity_scores):
-        return [1/len(entity_candidates) * score] * len(entity_candidates), entity_candidates, entity_candidates_id
-    else:
-        return [float(x) * score for x in entity_scores], entity_candidates, entity_candidates_id
-
-
 def update_history(entity_candidates, entity, scores, entity_candidates_id, total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head, value_flag):
     if value_flag:
         scores = [1/len(entity_candidates) * entity['score']]
@@ -240,10 +192,10 @@ def half_stop(question, cluster_chain_of_entities, depth, args, llm_logger, sess
 
 
 def generate_answer(question, cluster_chain_of_entities, args, llm_logger, session_key): 
-    prompt = answer_prompt_wiki + question + '\n'
+    prompt = half_stop_prompt + question + '\n'
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
-    llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
+    llm_logger.debug(f"generate answer prompt:\n{prompt}", extra={'session_key': session_key})
     result = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f"Final answer:{result}", extra={'session_key': session_key})
     return result
@@ -265,9 +217,8 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
     cluster_chain_of_entities = [[(tops[i], relations[i], candidates[i]) for i in range(len(candidates))]]
     return True, cluster_chain_of_entities, entities_id, relations, heads
 
-
 def reasoning(question, cluster_chain_of_entities, args, llm_logger, session_key):
-    prompt = prompt_evaluate_wiki + question
+    prompt = reasoning_prompt + question
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
     llm_logger.debug(f'reasoning prompt:\n{prompt}', extra={'session_key': session_key})
@@ -275,10 +226,10 @@ def reasoning(question, cluster_chain_of_entities, args, llm_logger, session_key
     llm_logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
     result = extract_answer(response)
     llm_logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})
-    if if_true(result):
-        return True, response
+    if result is not None:
+        return True, result
     else:
-        return False, response
+        return False, None
     
 
     
