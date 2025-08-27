@@ -164,20 +164,23 @@ def save_2_json(question, answer, cluster_chain_of_entities, file_name):
         json_str = json.dumps(dict)
         outfile.write(json_str + "\n")
 
-    
-def extract_answer(text):
-    start_index = text.find("{")
-    end_index = text.find("}")
-    if start_index != -1 and end_index != -1:
-        return text[start_index+1:end_index].strip()
-    else:
-        return ""
-    
 
-def if_true(prompt):
-    if prompt.lower().strip().replace(" ","")=="yes":
-        return True
-    return False
+def extract_answer(text):
+    pattern = r"@(True|False)@\.\s*@(.*?)@(?:\.\s*Therefore, the answer to the question is @(.*?)@)?"
+
+    match = re.match(pattern, text)
+    if match:
+        answered = match.group(1) if match.group(1) else False
+        explanation = match.group(2)
+        answer = match.group(3) if match.group(3) else None
+        return {
+            "answered":answered,
+            "explanation": explanation,
+            "answer": answer
+        }
+    else:
+        return None
+    
 
 
 def generate_without_explored_paths(question, args):
