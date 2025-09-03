@@ -46,7 +46,7 @@ def construct_relation_entity_prune_prompt(question, entity_name, relation_entit
                 result += f"{idx}. {pair['relation_label'].replace(' ', '_')} -- {candidate_name.replace(' ', '_')}\n"
                 idx += 1
             
-    prompt_str = extract_relation_entity_prompt %(entity_name, max(3,args['width']), question, result) 
+    prompt_str = extract_relation_entity_prompt %(entity_name, args['width'], question, result) 
     
     return prompt_str
 
@@ -214,13 +214,13 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
     entities_id, relations, candidates, tops, heads, scores = map(list, zip(*filtered_list))
     # wiki_client.qid2label(entity_id).pop()
     tops = [wiki_client.qid2label(entity_id) if (entity_name := wiki_client.qid2label(entity_id)) != "Not Found!" else "Unname_Entity" for entity_id in tops]
-    cluster_chain_of_entities = [[(tops[i], relations[i], candidates[i]) for i in range(len(candidates))]]
+    cluster_chain_of_entities = [(tops[i], relations[i], candidates[i]) for i in range(len(candidates))]
     return True, cluster_chain_of_entities, entities_id, relations, heads
 
 def reasoning(question, cluster_chain_of_entities, args, llm_logger, session_key):
     prompt = reasoning_prompt + question
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
-    prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
+    prompt += "\nKnowledge Triplets: " + chain_prompt + '\nA: '
     llm_logger.debug(f'reasoning prompt:\n{prompt}', extra={'session_key': session_key})
     response = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})

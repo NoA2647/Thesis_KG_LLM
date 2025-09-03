@@ -31,7 +31,7 @@ if __name__ == '__main__':
             'max_length' : 256, # the max length of LLMs output
             'temperature_exploration' : 0, # the temperature in exploration stage
             'temperature_reasoning' : 0, # the temperature in reasoning stage
-            'width' : 1, # choose the search width of ToG
+            'width' : 3, # choose the search width of ToG
             'depth' : 3, # choose the search depth of ToG
             'remove_unnecessary_rel' : True, # whether removing unnecessary relations
             'LLM_type' : 'gpt-4o-mini', # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
