@@ -82,7 +82,7 @@ def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
     idx = 1
     for triplet in te_r_ce_list:
         if triplet['entity_candidate_id'] != None:
-            result += f"{idx}. {triplet["topic_entity_label"].replace(' ', '_')} -- {triplet['relation_label'].replace(' ', '_')} -- {triplet['entity_candidate_label'].replace(' ', '_')}\n"
+            result += f"{idx}. {triplet['topic_entity_label'].replace(' ', '_')} -- {triplet['relation_label'].replace(' ', '_')} -- {triplet['entity_candidate_label'].replace(' ', '_')}\n"            
             idx += 1
 
     prompt_str = score_te_r_ce_prompt %(question, result) 
