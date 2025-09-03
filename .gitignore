@@ -106,3 +106,5 @@ env/
 *.code-workspace
 
 test.ipynb
+
+Graph/
