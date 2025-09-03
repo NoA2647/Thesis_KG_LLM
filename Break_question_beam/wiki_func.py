@@ -119,9 +119,6 @@ def abandon_rels(relation):
     return False
 
 
-def construct_entity_score_prompt(question, relation, entity_candidates):
-    return score_entity_candidates_prompt_wiki.format(question, relation) + "; ".join(entity_candidates) + '\nScore: '
-
 def retrieve_relation_entity_pairs(entity_id, pre_relations, args, wiki_client, llm_logger, session_key):
     # Retrieve all relations for the current entity
     relations = wiki_client.get_all_relations_of_an_entity(entity_id)
@@ -170,29 +167,6 @@ def break_question(question, entity_name, args, llm_logger, session_key):
         return sub_questions
     else:
         return []
-
-
-def relation_search_prune(entity_id, entity_name, pre_relations, question, args, wiki_client, llm_logger, session_key):
-    relations = wiki_client.get_all_relations_of_an_entity(entity_id)
-    head_relations = [rel['label'] for rel in relations]
-    
-    if args['remove_unnecessary_rel']:
-        head_relations = [relation for relation in head_relations if not abandon_rels(relation)]
-    head_relations = list(set(head_relations) - set(pre_relations))
-    
-    total_relations = list(set(head_relations))
-    total_relations.sort()  # make sure the order in prompt is always equal
-    llm_logger.debug(f'Relations extracted from wikipedia:\n{total_relations}', extra={'session_key': session_key})
-    prompt = construct_relation_prune_prompt(question, entity_name, total_relations, args)
-    llm_logger.debug(f'relation_search_prune prompt:\n{prompt}\n', extra={'session_key': session_key})
-    result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
-    llm_logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
-    flag, retrieve_relations_with_scores = clean_relations(result, entity_id) 
-
-    if flag:
-        return retrieve_relations_with_scores
-    else:
-        return [] # format error or too small max_length
     
 
 def del_all_unknown_entity(entity_candidates_id, entity_candidates_name):
@@ -267,7 +241,7 @@ def half_stop(question, walker, depth, args, llm_logger, session_key):
 
 
 def generate_answer(question, walker, args, llm_logger, session_key): 
-    prompt = answer_prompt_wiki + question + '\n'
+    prompt = half_stop_prompt + question + '\n'
     prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
     result = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
@@ -291,7 +265,7 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
 
 
 def reasoning(question, walker, args, llm_logger, session_key):
-    prompt = prompt_evaluate_wiki + question
+    prompt = reasoning_prompt + question
     prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f'reasoning prompt:\n{prompt}', extra={'session_key': session_key})
     response = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])

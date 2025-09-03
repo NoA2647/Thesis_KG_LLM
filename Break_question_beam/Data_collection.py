@@ -3,41 +3,6 @@ from bs4 import BeautifulSoup
 import time
 import json
 import os
-
-
-class WikiData():
-    
-    def __init__(self):
-        self.url = "https://www.wikidata.org/wiki/Special:EntityData/"
-        
-        
-    def get_entity_info(self, entity:str):
-        entity_info = {}
-        response = requests.get(self.url+entity+".json")
-        data = response.json()
-        entity_info['label'] = data['entities'][entity]['labels']['en']['value']
-        entity_info['descriptions'] = data['entities'][entity]['descriptions']['en']['value']
-        # get relations
-        entity_info['claims'] = data['entities'][entity]['claims']
-        # preprocess relations to get other entities
-        for claim in entity_info['claims']:
-            new_entities = []
-            for new_entity in entity_info['claims'][claim]:
-                if new_entity['mainsnak']['datavalue']['type'] == 'wikibase-entityid':
-                    new_entities.append(new_entity['mainsnak']['datavalue']['value']['id'])
-                else:
-                    new_entities.append(new_entity['mainsnak']['datavalue']['value'])
-                    
-            entity_info['claims'][claim] = {}  
-            entity_info['claims'][claim]['entites'] = new_entities
-            entity_info['claims'][claim]['label'] = self.get_relation_label(claim)
-        
-        return entity_info
-
-    def get_relation_label(self, relation:str):
-        response = requests.get(self.url+relation+".json")
-        data = response.json()
-        return data['entities'][relation]['labels']['en']['value']
     
 class WikiDataB():
     def __init__(self):
@@ -54,8 +19,10 @@ class WikiDataB():
             
         else:
             url = self.root + entity_qid
-            response = requests.get(url)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            with requests.Session() as session:
+                session.trust_env = False  # ignores HTTP_PROXY/HTTPS_PROXY from environment
+                response = session.get(url)
+            soup = BeautifulSoup(response.content, 'html.parser')  
             entity_info = {}
             
             entity_info['label'] = soup.find('span', class_='wikibase-title-label').text
