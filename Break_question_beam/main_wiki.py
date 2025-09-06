@@ -58,11 +58,11 @@ if __name__ == '__main__':
         # check to remove
         pre_heads= [-1] * len(topic_entity)
         flag_printed = False
-        wiki_client = WikiDataB()
+        wiki_client = WikiDataC()
         paths = []
         next_topic_entities = []
         # just for test, remember to delete
-        topic_entity = {"Q9696": "John F. Kennedy"}
+        # topic_entity = {"Q9696": "John F. Kennedy"}
         initials = []
         for entity in topic_entity:
             next_topic_entities.append({'current_ent_qid':entity, 'current_ent_label':topic_entity[entity]})
