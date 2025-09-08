@@ -56,7 +56,6 @@ if __name__ == '__main__':
         # check to remove
         pre_relations = []
         # check to remove
-        pre_heads= [-1] * len(topic_entity)
         flag_printed = False
         wiki_client = WikiDataC()
         paths = []
@@ -141,13 +140,12 @@ if __name__ == '__main__':
                 # score N^2 TE_R_CE(walk)
                 flag, pruned_TE_R_CE_list = te_r_ce_score(current_TE_R_CE_list, sub_question, args, llm_logger, session_key)
                 # prune walks base on beam search
-                flag, chain_of_entities, entities_id, pre_relations, pre_heads = entity_prune(
+                flag, chain_of_entities, entities_id, pre_relations = entity_prune(
                     [item['entity_candidate_id'] for item in pruned_TE_R_CE_list],
                     [item['relation_label'] for item in pruned_TE_R_CE_list],
                     [item['entity_candidate_label'] for item in pruned_TE_R_CE_list],
                     [item['topic_entity_id'] for item in pruned_TE_R_CE_list],
                     [item['topic_entity_label'] for item in pruned_TE_R_CE_list],
-                    [1] * len(pruned_TE_R_CE_list),  # Assuming head = 1 for all
                     [item['score'] for item in pruned_TE_R_CE_list],
                     args
                 )

@@ -249,19 +249,19 @@ def generate_answer(question, walker, args, llm_logger, session_key):
     return result
 
 
-def entity_prune(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_head, total_scores, args):
-    zipped = list(zip(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_head, total_scores))
+def entity_prune(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_scores, args):
+    zipped = list(zip(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_scores))
     sorted_zipped = sorted(zipped, key=lambda x: x[-1], reverse=True)
-    sorted_entities_id, sorted_relations, sorted_candidates, sorted_topic_entities, sorted_topic_entities_label, sorted_head, sorted_scores = [x[0] for x in sorted_zipped], [x[1] for x in sorted_zipped], [x[2] for x in sorted_zipped], [x[3] for x in sorted_zipped], [x[4] for x in sorted_zipped], [x[5] for x in sorted_zipped], [x[6] for x in sorted_zipped]
+    sorted_entities_id, sorted_relations, sorted_candidates, sorted_topic_entities, sorted_topic_entities_label, sorted_scores = [x[0] for x in sorted_zipped], [x[1] for x in sorted_zipped], [x[2] for x in sorted_zipped], [x[3] for x in sorted_zipped], [x[4] for x in sorted_zipped], [x[5] for x in sorted_zipped]
 
-    entities_id, relations, candidates, topics, topics_label, heads, scores = sorted_entities_id[:args['width']], sorted_relations[:args['width']], sorted_candidates[:args['width']], sorted_topic_entities[:args['width']], sorted_topic_entities_label[:args['width']], sorted_head[:args['width']], sorted_scores[:args['width']]
-    merged_list = list(zip(entities_id, relations, candidates, topics, topics_label, heads, scores))
-    filtered_list = [(id, rel, ent, top, topl, hea, score) for id, rel, ent, top, topl, hea, score in merged_list if score != 0]
+    entities_id, relations, candidates, topics, topics_label, scores = sorted_entities_id[:args['width']], sorted_relations[:args['width']], sorted_candidates[:args['width']], sorted_topic_entities[:args['width']], sorted_topic_entities_label[:args['width']], sorted_scores[:args['width']]
+    merged_list = list(zip(entities_id, relations, candidates, topics, topics_label, scores))
+    filtered_list = [(id, rel, ent, top, topl, score) for id, rel, ent, top, topl, score in merged_list if score != 0]
     if len(filtered_list) ==0:
-        return False, [], [], [], []
-    entities_id, relations, candidates, tops, topls, heads, scores = map(list, zip(*filtered_list))
+        return False, [], [], []
+    entities_id, relations, candidates, tops, topls, scores = map(list, zip(*filtered_list))
     cluster_chain_of_entities = [(topls[i], relations[i], candidates[i], scores[i]) for i in range(len(candidates))]
-    return True, cluster_chain_of_entities, entities_id, relations, heads
+    return True, cluster_chain_of_entities, entities_id, relations
 
 
 def reasoning(question, walker, args, llm_logger, session_key):
