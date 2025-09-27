@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from .errors import ConfigError
-from .types import CombineRule
+import os
+import dotenv
+from app.core.errors import ConfigError
+from app.core.types import CombineRule
 
 @dataclass(slots=True)
 class RunConfig:
@@ -10,7 +12,8 @@ class RunConfig:
     Central configuration for a run.
     Move your old `args` dict fields into here.
     """
-    
+    dotenv.load_dotenv()
+   
     # Search / beam settings
     beam_width: int = 3
     combine_rule: CombineRule = "add"
@@ -18,14 +21,14 @@ class RunConfig:
 
     # KG / pruning
     remove_unnecessary_rel: bool = True
-    pruning_enabled: bool = False
+    pruning_enabled: bool = True
 
     # LLM / API
-    openai_api_key: str = ""
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     llm_type: str = "gpt-4o-mini"       # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini")
     temperature_exploration: float = 0.0
     temperature_reasoning: float = 0.0
-    max_length: int = 512
+    max_length: int = 1024
 
     # Dataset name
     dataset: str = 'cwq'
