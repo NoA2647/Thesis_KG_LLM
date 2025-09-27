@@ -61,7 +61,7 @@ if __name__ == '__main__':
         paths = []
         next_topic_entities = []
         # just for test, remember to delete
-        # topic_entity = {"Q9696": "John F. Kennedy"}
+        topic_entity = {"Q9696": "John F. Kennedy"}
         initials = []
         for entity in topic_entity:
             next_topic_entities.append({'current_ent_qid':entity, 'current_ent_label':topic_entity[entity]})
