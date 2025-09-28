@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 import os, json, time, requests
-from typing import Dict, Any, List, Tuple, Set
+from typing import Dict, Any, List, Set
     
 class WikiDataB():
     def __init__(self):

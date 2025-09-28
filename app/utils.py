@@ -1,9 +1,8 @@
-from prompt_list import *
+from app.prompt_list import *
 import json
 import time
 from openai import OpenAI
 import re
-from prompt_list import *
 # from rank_bm25 import BM25Okapi
 # from sentence_transformers import util
 # from sentence_transformers import SentenceTransformer
