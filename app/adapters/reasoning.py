@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 from typing import Dict, List, Optional
-
+import logging
 from app.core.config import RunConfig
 from app.core.models import PathResult, Branch, Hop
-from wiki_func import reasoning as legacy_reasoning  # your existing function
+from app.wiki_func import reasoning as legacy_reasoning
 
+logger = logging.getLogger("app.adapters.llm")
 
 class Reasoner:
     """
@@ -21,12 +20,12 @@ class LLMReasoner(Reasoner):
     synthesizing a 'walker-like' object that provides `.format_for_llm()`.
     """
 
-    def __init__(self, cfg: RunConfig, llm_logger=None):
+    def __init__(self, cfg: RunConfig):
         self.cfg = cfg
-        self.llm_logger = llm_logger or _NullLogger()
 
     def reason(self, main_q: str, results: List[PathResult], *, session_key: Optional[str] = None) -> Dict:
         # 1) Gather all branches across paths
+        sk = session_key or "-"
         branches: List[Branch] = []
         for pr in results:
             branches.extend(pr.final_branches)
@@ -38,6 +37,7 @@ class LLMReasoner(Reasoner):
         walker_shim = _WalkerShim(triplets_text)
 
         # 4) Call your existing reasoning(...)
+        logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": sk})
         ok, answer = legacy_reasoning(
             question=main_q,
             walker=walker_shim,
@@ -50,10 +50,11 @@ class LLMReasoner(Reasoner):
                 # the rest are ignored downstream
                 "width": self.cfg.beam_width,
             },
-            llm_logger=self.llm_logger,
-            session_key=session_key or "",
+            llm_logger=logger,
+            session_key=sk,
         )
-
+        
+        logger.info("reasoning done", extra={"session_key": sk})
         return {"ok": bool(ok), "answer": answer}
 
 # --- helpers --- #

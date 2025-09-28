@@ -1,13 +1,13 @@
 from typing import List, Tuple
-
+import logging
 from app.core.config import RunConfig
 from app.core.models import RelationEdge, TopicEntity
 from app.core.errors import KGError
-from Data_collection import WikiDataC
+from app.Data_collection import WikiDataC
 from app.wiki_func import abandon_rels
 
+logger = logging.getLogger("app.adapters.kg")
 
-## why we need this?
 class KGClient:
     """
     Interface for retrieving (RelationEdge, CandidateEntity) pairs from a frontier TE.
@@ -32,17 +32,21 @@ class WikidataKG(KGClient):
 
     def relations(self, te: TopicEntity) -> List[Tuple[RelationEdge, TopicEntity]]:
         if not te.qid:
-            # For literal frontiers there are no outgoing Wikidata item relations
+            logger.debug("frontier is a literal; no outgoing relations", extra={"session_key": "-"})
             return []
 
         try:
             rels = self.wiki.get_all_relations_of_an_entity(te.qid)  # [{pid,label}]
+            logger.debug(f"relations fetched: {len(rels)} for {te.qid}", extra={"session_key": "-"})
         except Exception as e:
-            raise KGError(f"Failed to get relations for {te.qid}: {e}") from e
+            logger.error(f"get_all_relations failed for {te.qid}: {e}", extra={"session_key": "-"})
+            raise KGError(str(e)) from e
 
         # optional removal of noisy/unhelpful relations
         if self.cfg.remove_unnecessary_rel:
+            before = len(rels)
             rels = [r for r in rels if not abandon_rels(r["label"])]
+            logger.debug(f"filtered relations: {before}->{len(rels)}", extra={"session_key": "-"})
 
         out: List[Tuple[RelationEdge, TopicEntity]] = []
 
@@ -56,6 +60,7 @@ class WikidataKG(KGClient):
                 # tails: [{"label": ..., "qid": ...}] (qid may be None for literals)
             except Exception as e:
                 # If a single property fails, skip it but continue
+                logger.warning(f"tails fetch failed for {te.qid} {pid}: {e}", extra={"session_key": "-"})
                 continue
 
             edge = RelationEdge(pid=str(pid), label=str(label))
@@ -66,4 +71,5 @@ class WikidataKG(KGClient):
                 ce = TopicEntity(qid=ce_qid, label=ce_label, is_value=is_value)
                 out.append((edge, ce))
 
+        logger.debug(f"pairs produced: {len(out)} for {te.qid}", extra={"session_key": "-"})
         return out

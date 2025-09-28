@@ -1,9 +1,12 @@
 from typing import List, Optional
-
+import logging
 from app.core.config import RunConfig
 from app.core.models import TopicEntity
 from app.core.errors import SubquestionError
-from wiki_func import break_question  # your existing function
+from app.wiki_func import break_question
+
+
+logger = logging.getLogger("app.adapters.llm")
 
 class SubQGenerator:
     """
@@ -18,11 +21,11 @@ class LLMSubQGenerator(SubQGenerator):
     Wraps your `break_question(...)` call and returns the cleaned list of subquestions.
     """
 
-    def __init__(self, cfg: RunConfig, llm_logger=None):
+    def __init__(self, cfg: RunConfig):
         self.cfg = cfg
-        self.llm_logger = llm_logger  # optional; you can inject your logger later
 
     def generate(self, main_q: str, initial: TopicEntity, *, session_key: Optional[str] = None) -> List[str]:
+        sk = session_key or "-"
         try:
             subs = break_question(
                 question=main_q,
@@ -37,12 +40,13 @@ class LLMSubQGenerator(SubQGenerator):
                     "width": self.cfg.beam_width,
                     "remove_unnecessary_rel": self.cfg.remove_unnecessary_rel,
                 },
-                llm_logger=self.llm_logger or _NullLogger(),
-                session_key=session_key or "",
+                llm_logger=logger,
+                session_key=sk,
             )
+            logger.info(f"subqs generated: {len(subs)} for {initial.label}", extra={"session_key": sk})
             return subs or []
         except Exception as e:
-            # Surface as empty list; engine will end path gracefully.
+            logger.error(f"subq generation failed for {initial.label}: {e}", extra={"session_key": sk})
             return []
 
 

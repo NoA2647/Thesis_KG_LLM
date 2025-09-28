@@ -1,11 +1,12 @@
 from typing import List
-
+import logging
 from app.core.models import Branch, Hop, TopicEntity, RelationEdge
 from app.core.types import CombineRule
 from app.adapters.kg_client import KGClient
 from app.adapters.pruning import Pruner
 from app.adapters.scoring import Scorer
 
+logger = logging.getLogger("app.path_search.expander")
 
 class BranchExpander:
     """
@@ -28,6 +29,7 @@ class BranchExpander:
         """
         frontier: TopicEntity = branch.frontier
         pairs: List[tuple[RelationEdge, TopicEntity]] = self.kg.relations(frontier)
+        logger.debug(f"expand frontier={frontier.label} pairs={len(pairs)}", extra={"session_key": "-"})
 
         if not pairs:
             return []
@@ -44,4 +46,5 @@ class BranchExpander:
             new_history = list(branch.history)
             new_history.append(Hop(source=frontier, relation=rel, target=ce, hop_score=hop_score))
             out.append(Branch(history=new_history, frontier=ce, cum_score=new_cum, alive=True))
+        logger.debug(f"expanded branches: {len(out)}", extra={"session_key": "-"})
         return out

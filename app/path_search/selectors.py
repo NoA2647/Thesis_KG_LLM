@@ -1,7 +1,8 @@
+import logging
 from typing import List
-
 from app.core.models import Branch
 
+logger = logging.getLogger("app.path_search.selector")
 
 class BranchSelector:
     """
@@ -24,4 +25,6 @@ class BranchSelector:
 
         # Sort by primary desc, tie-breakers asc
         sorted_cands = sorted(candidates, key=_key, reverse=True)
-        return sorted_cands[:k]
+        out = sorted_cands[:k]
+        logger.info(f"select_top_k candidates={len(candidates)} -> kept={len(out)}", extra={"session_key": "-"})
+        return out
