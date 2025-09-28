@@ -1,11 +1,8 @@
-from prompt_list import *
-import json
-import openai
+from app.prompt_list import *
 import re
-import time
-from utils import *
-
-
+from app.utils import *
+from typing import List, Tuple
+from app.core.models import TopicEntity, RelationEdge
 def transform_relation(relation):
     relation_without_prefix = relation.replace("wiki.relation.", "").replace("_", " ")
     return relation_without_prefix
@@ -57,7 +54,7 @@ def clean_te_r_ce_triplets(result, te_r_ce_list):
     return bool(scored_triplets), scored_triplets
 
 # Clean the relation-entity results:
-def clean_relation_entity_pairs(result, entity_id, entity_label, relation_entity_pairs):
+def clean_relation_entity_pairs(result, entity_id, entity_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]]) -> List[Tuple[RelationEdge, TopicEntity]]:
     result = result.replace("**", "")
     pattern = r'(?P<relation_label>[\w_]+)\s*--\s*(?P<entity_candidate_label>[\w_ .]+):\s*(?P<sentence>.*?)\s*Score:\s*(?P<score>\d+\.\d+)'
     entity_candidate_id = None
@@ -69,13 +66,12 @@ def clean_relation_entity_pairs(result, entity_id, entity_label, relation_entity
         # Handle the score safely
         score_str = match.group("score")
         score = float(score_str) if score_str else 0.0
-        for l in relation_entity_pairs:
-            for candidate_name, candidate_id in zip(l['entity_candidates_label'], l['entity_candidates_id']):
-                if entity_candidate_label == candidate_name.replace(" ","_"):
-                    entity_candidate_id = candidate_id
-                    entity_candidate_label = candidate_name
-        scored_pairs.append({"topic_entity_id": entity_id, "topic_entity_label": entity_label, "relation_label": relation_label, "entity_candidate_id":entity_candidate_id, "entity_candidate_label": entity_candidate_label, "score": score})
-    return bool(scored_pairs), scored_pairs
+        for pair in relation_entity_pairs:
+            if entity_candidate_label == pair[1].label.replace(" ","_"):
+                entity_candidate_id = pair[1].qid
+                entity_candidate_label = pair[1].label
+        scored_pairs.append((TopicEntity(qid=entity_candidate_id, label=entity_candidate_label, is_value=False), RelationEdge("", relation_label)))
+    return scored_pairs
 
 def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
     result = ""
@@ -89,14 +85,11 @@ def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
     
     return prompt_str
 
-def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs, args):
+def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], args):
     result = ""
-    idx = 1
-    for pair in relation_entity_pairs:
-        for candidate_name, candidate_id in zip(pair['entity_candidates_label'], pair['entity_candidates_id']):
-            if candidate_id != None:
-                result += f"{idx}. {pair['relation_label'].replace(' ', '_')} -- {candidate_name.replace(' ', '_')}\n"
-                idx += 1
+    for idx, pair in enumerate(relation_entity_pairs, start=1):
+        if pair[1].qid != None:
+            result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n"
             
     prompt_str = extract_relation_entity_prompt %(entity_name, args['width'], question, result) 
     
@@ -145,15 +138,16 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, args, wiki_client, 
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}', extra={'session_key': session_key})
     return relation_entity_pairs
 
-def relation_entity_search_prune(entity_id, entity_name, question, relation_entity_pairs, args, llm_logger, session_key):
+def relation_entity_search_prune(entity_id, entity_name, question, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+                                 args, llm_logger, session_key
+                                 )-> List[Tuple[RelationEdge, TopicEntity]]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
     prompt = construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs, args)
     llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{prompt}', extra={'session_key': session_key})
     result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
-    flag, scored_pairs = clean_relation_entity_pairs(result, entity_id, entity_name, relation_entity_pairs)
-    return scored_pairs if flag else []
+    return clean_relation_entity_pairs(result, entity_id, entity_name, relation_entity_pairs)
 
 
 def break_question(question, entity_name, args, llm_logger, session_key):
