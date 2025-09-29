@@ -1,3 +1,6 @@
-from typing import Literal
+from enum import Enum
 
-CombineRule = Literal["add", "mul", "log"]
+class CombineRule(str, Enum):
+    ADD = "add"
+    MUL = "mul"
+    LOG = "log"

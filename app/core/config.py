@@ -16,7 +16,7 @@ class RunConfig:
    
     # Search / beam settings
     beam_width: int = 3
-    combine_rule: CombineRule = "add"
+    combine_rule: CombineRule = CombineRule.ADD
     frontier_cap: int = 1
 
     # KG / pruning
