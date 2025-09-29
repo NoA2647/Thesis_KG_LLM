@@ -34,17 +34,15 @@ class BranchExpander:
         if not pairs:
             return []
 
-        # optional pruning
-        pairs = self.pruner.prune(subq=subq, te=frontier, pairs=pairs)
-        if not pairs:
+        hops: List[Hop] = self.pruner.prune(subq=subq, te=frontier, pairs=pairs)
+        if not hops:
             return []
 
         out: List[Branch] = []
-        for rel, ce in pairs:
-            hop_score = self.scorer.hop_score(subq=subq, te=frontier, rel=rel, ce=ce)
-            new_cum = self.scorer.combine(branch.cum_score, hop_score, self.combine_rule)
+        for hop in hops:
+            new_cum = self.scorer.combine(branch.cum_score, hop.hop_score, self.combine_rule)
             new_history = list(branch.history)
-            new_history.append(Hop(source=frontier, relation=rel, target=ce, hop_score=hop_score))
-            out.append(Branch(history=new_history, frontier=ce, cum_score=new_cum, alive=True))
+            new_history.append(hop)
+            out.append(Branch(history=new_history, frontier=hop.target, cum_score=new_cum, alive=True))
         logger.debug(f"expanded branches: {len(out)}", extra={"session_key": "-"})
         return out
