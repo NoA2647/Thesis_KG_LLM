@@ -15,6 +15,7 @@ class Pruner:
         subq: str,
         te: TopicEntity,
         pairs: List[Tuple[RelationEdge, TopicEntity]],
+        session_key: str,
     ) -> List[Hop]:
         raise NotImplementedError
 
@@ -31,9 +32,8 @@ class LLMPruning(Pruner):
         subq: str,
         te: TopicEntity,
         pairs: List[Tuple[RelationEdge, TopicEntity]],
-        session_key: Optional[str] = None
+        session_key: str
     ) -> List[Hop]:
-        sk = session_key or "-"
 
         if not te.qid or not pairs:
             return [Hop(te, rel, ce, 0.0) for rel, ce in pairs]
@@ -47,14 +47,7 @@ class LLMPruning(Pruner):
                 # fields below are ignored by break_question but harmless
                 "width": self.cfg.beam_width,
                 "remove_unnecessary_rel": self.cfg.remove_unnecessary_rel,
-            }, logger, sk)
-        logger.debug(f"LLM pruning applied; hops={len(hops)}", extra={"session_key": sk})
+            }, logger, session_key)
+        logger.debug(f"LLM pruning applied; hops={len(hops)}", extra={"session_key": session_key})
 
         return hops
-
-
-# (Optional) future: LLM-based pruning that reuses your 'relation_entity_search_prune'
-# NOTE: Your current function expects a different (grouped) input shape.
-# When you want this, we’ll build a small grouping adapter here to convert:
-#   flattened pairs -> relation_entity_pairs format -> call your function
-#   -> map back to flattened filtered pairs.

@@ -10,7 +10,7 @@ class Reasoner:
     """
     Interface for final reasoning over all path results.
     """
-    def reason(self, main_q: str, results: List[PathResult], *, session_key: Optional[str] = None) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult], *, session_key: str) -> Dict:
         raise NotImplementedError
 
 
@@ -23,9 +23,8 @@ class LLMReasoner(Reasoner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def reason(self, main_q: str, results: List[PathResult], *, session_key: Optional[str] = None) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult], *, session_key: str) -> Dict:
         # 1) Gather all branches across paths
-        sk = session_key or "-"
         branches: List[Branch] = []
         for pr in results:
             branches.extend(pr.final_branches)
@@ -37,7 +36,7 @@ class LLMReasoner(Reasoner):
         walker_shim = _WalkerShim(triplets_text)
 
         # 4) Call your existing reasoning(...)
-        logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": sk})
+        logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": session_key})
         ok, answer = legacy_reasoning(
             question=main_q,
             walker=walker_shim,
@@ -51,10 +50,10 @@ class LLMReasoner(Reasoner):
                 "width": self.cfg.beam_width,
             },
             llm_logger=logger,
-            session_key=sk,
+            session_key=session_key,
         )
         
-        logger.info("reasoning done", extra={"session_key": sk})
+        logger.info("reasoning done", extra={"session_key": session_key})
         return {"ok": bool(ok), "answer": answer}
 
 # --- helpers --- #
@@ -86,10 +85,3 @@ class _WalkerShim:
 
     def format_for_llm(self) -> str:
         return self._text
-
-
-class _NullLogger:
-    def debug(self, *args, **kwargs): pass
-    def info(self, *args, **kwargs): pass
-    def warning(self, *args, **kwargs): pass
-    def error(self, *args, **kwargs): pass

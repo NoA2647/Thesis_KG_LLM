@@ -22,11 +22,10 @@ class PathPipeline:
         self.reasoner = reasoner
         self.cfg = cfg
 
-    def run(self, main_question: str, initial_entities: List[TopicEntity], *, session_key: Optional[str] = None) -> Dict:
+    def run(self, main_question: str, initial_entities: List[TopicEntity], *, session_key: str) -> Dict:
         # Optional cap on number of paths to process
-        sk = session_key or "-"
         initials = initial_entities[: self.cfg.max_paths] if self.cfg.max_paths else list(initial_entities)
-        logger.info(f"pipeline_start initials={len(initials)} qlen={len(main_question)}", extra={"session_key": sk})
+        logger.info(f"pipeline_start initials={len(initials)} qlen={len(main_question)}", extra={"session_key": session_key})
 
         path_results: List[PathResult] = []
         for idx, initial in enumerate(initials):
@@ -34,7 +33,7 @@ class PathPipeline:
             subqs = self.subq_gen.generate(main_q=main_question, initial=initial, session_key=session_key)
             if not subqs:
                 # No subquestions -> degenerate path result with empty final branches
-                logger.warning(f"no subqs for {initial.label}", extra={"session_key": sk})
+                logger.warning(f"no subqs for {initial.label}", extra={"session_key": session_key})
                 path_results.append(
                     PathResult(
                         path_id=f"path_{idx}_{initial.qid or initial.label}",
@@ -46,10 +45,10 @@ class PathPipeline:
                 continue
 
             # 2) run per-path beam search
-            res = self.engine.run_path(subqs=subqs, initial=initial, path_id=f"path_{idx}_{initial.qid or initial.label}")
+            res = self.engine.run_path(subqs=subqs, initial=initial, path_id=f"path_{idx}_{initial.qid or initial.label}", session_key=session_key)
             path_results.append(res)
 
         # 3) run reasoning over all paths
         answer = self.reasoner.reason(main_q=main_question, results=path_results, session_key=session_key)
-        logger.info("pipeline_done", extra={"session_key": sk})
+        logger.info("pipeline_done", extra={"session_key": session_key})
         return {"answer": answer, "paths": path_results}

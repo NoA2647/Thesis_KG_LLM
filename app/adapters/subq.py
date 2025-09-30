@@ -12,7 +12,7 @@ class SubQGenerator:
     """
     Interface for generating subquestions given main question and initial entity.
     """
-    def generate(self, main_q: str, initial: TopicEntity, *, session_key: Optional[str] = None) -> List[str]:
+    def generate(self, main_q: str, initial: TopicEntity, *, session_key: str) -> List[str]:
         raise NotImplementedError
 
 
@@ -24,8 +24,7 @@ class LLMSubQGenerator(SubQGenerator):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def generate(self, main_q: str, initial: TopicEntity, *, session_key: Optional[str] = None) -> List[str]:
-        sk = session_key or "-"
+    def generate(self, main_q: str, initial: TopicEntity, *, session_key: str) -> List[str]:
         try:
             subs = break_question(
                 question=main_q,
@@ -41,21 +40,10 @@ class LLMSubQGenerator(SubQGenerator):
                     "remove_unnecessary_rel": self.cfg.remove_unnecessary_rel,
                 },
                 llm_logger=logger,
-                session_key=sk,
+                session_key=session_key,
             )
-            logger.info(f"subqs generated: {len(subs)} for {initial.label}", extra={"session_key": sk})
+            logger.info(f"subqs generated: {len(subs)} for {initial.label}", extra={"session_key": session_key})
             return subs or []
         except Exception as e:
-            logger.error(f"subq generation failed for {initial.label}: {e}", extra={"session_key": sk})
+            logger.error(f"subq generation failed for {initial.label}: {e}", extra={"session_key": session_key})
             return []
-
-
-class _NullLogger:
-    def debug(self, *args, **kwargs):
-        pass
-    def info(self, *args, **kwargs):
-        pass
-    def warning(self, *args, **kwargs):
-        pass
-    def error(self, *args, **kwargs):
-        pass
