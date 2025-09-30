@@ -53,31 +53,54 @@ def clean_te_r_ce_triplets(result, te_r_ce_list):
                 break
     return bool(scored_triplets), scored_triplets
 
-# Clean the relation-entity results:
+def parse_items(result: str):
+    # 1) normalize markup / punctuation
+    text = (result
+            .replace("**", "")
+            .replace("—", "--")
+            .replace("–", "--"))
+
+    # 2) compile with DOTALL so sentence can contain anything (incl. newlines)
+    pattern = re.compile(
+        r'(?:^\s*\d+\.\s*)?'                                 # optional numbering at line start
+        r'(?P<relation_label>[\w_]+)\s*'                     # relation
+        r'(?:--|—|–|\s*--\s*)\s*'                            # tolerate dash variants / spacing
+        r'(?P<entity_candidate_label>[^:]+?)\s*'             # up to the colon, lazy
+        r':\s*'
+        r'(?P<sentence>.*?)\s*'                              # explanation text
+        r'Score:\s*(?P<score>\d+(?:\.\d+)?)',                # 0.4 or 1 (support ints too)
+        re.DOTALL | re.MULTILINE
+    )
+
+    matches = []
+    for m in pattern.finditer(text):
+        matches.append({
+            "relation_label": m.group("relation_label").strip(),
+            "entity_candidate_label": m.group("entity_candidate_label").strip(),
+            "sentence": m.group("sentence").strip(),
+            "score": float(m.group("score")) if m.group("score") else 0.0
+        })
+    return matches
+
+
 def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]]) -> List[Hop]:
-    result = result.replace("**", "")
-    pattern = r'(?P<relation_label>[\w_]+)\s*--\s*(?P<entity_candidate_label>[\w_ .]+):\s*(?P<sentence>.*?)\s*Score:\s*(?P<score>\d+\.\d+)'
+    matches = parse_items(result)
     scored_hops: List[Hop] = []
-    for match in re.finditer(pattern, result):
-        relation_label = match.group("relation_label").strip()
-        entity_candidate_label = match.group("entity_candidate_label").strip()
-        # Handle the score safely
-        score_str = match.group("score")
-        score = float(score_str) if score_str else 0.0
-        
+    for match in matches:
         for pair in relation_entity_pairs:
-            if entity_candidate_label == pair[1].label.replace(" ","_") and relation_label == pair[0].label.replace(" ","_"):
+            if match['entity_candidate_label'] == pair[1].label.replace(" ","_") and match['relation_label'] == pair[0].label.replace(" ","_"):
                 scored_hops.append(
                     Hop(
                         source=te,
                         relation=pair[0],
                         target=pair[1],
-                        hop_score=score
+                        hop_score=match['score']
                     )
                 )
                 break
         
     return scored_hops
+
 
 def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
     result = ""
