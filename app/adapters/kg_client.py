@@ -37,9 +37,9 @@ class WikidataKG(KGClient):
 
         try:
             rels = self.wiki.get_all_relations_of_an_entity(te.qid)  # [{pid,label}]
-            logger.debug(f"relations fetched: {len(rels)} for {te.qid}", extra={"session_key": "-"})
+            logger.debug(f"relations fetched: {len(rels)} for {te.label}({te.qid})", extra={"session_key": "-"})
         except Exception as e:
-            logger.error(f"get_all_relations failed for {te.qid}: {e}", extra={"session_key": "-"})
+            logger.error(f"get_all_relations failed for {te.label}({te.qid}): {e}", extra={"session_key": "-"})
             raise KGError(str(e)) from e
 
         # optional removal of noisy/unhelpful relations
