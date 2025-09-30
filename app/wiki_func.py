@@ -2,7 +2,7 @@ from app.prompt_list import *
 import re
 from app.utils import *
 from typing import List, Tuple
-from app.core.models import TopicEntity, RelationEdge
+from app.core.models import TopicEntity, RelationEdge, Hop
 def transform_relation(relation):
     relation_without_prefix = relation.replace("wiki.relation.", "").replace("_", " ")
     return relation_without_prefix
@@ -54,24 +54,30 @@ def clean_te_r_ce_triplets(result, te_r_ce_list):
     return bool(scored_triplets), scored_triplets
 
 # Clean the relation-entity results:
-def clean_relation_entity_pairs(result, entity_id, entity_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]]) -> List[Tuple[RelationEdge, TopicEntity]]:
+def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]]) -> List[Hop]:
     result = result.replace("**", "")
     pattern = r'(?P<relation_label>[\w_]+)\s*--\s*(?P<entity_candidate_label>[\w_ .]+):\s*(?P<sentence>.*?)\s*Score:\s*(?P<score>\d+\.\d+)'
-    entity_candidate_id = None
-    scored_pairs = []
+    scored_hops: List[Hop] = []
     for match in re.finditer(pattern, result):
         relation_label = match.group("relation_label").strip()
         entity_candidate_label = match.group("entity_candidate_label").strip()
-        
         # Handle the score safely
         score_str = match.group("score")
         score = float(score_str) if score_str else 0.0
+        
         for pair in relation_entity_pairs:
-            if entity_candidate_label == pair[1].label.replace(" ","_"):
-                entity_candidate_id = pair[1].qid
-                entity_candidate_label = pair[1].label
-        scored_pairs.append((TopicEntity(qid=entity_candidate_id, label=entity_candidate_label, is_value=False), RelationEdge("", relation_label)))
-    return scored_pairs
+            if entity_candidate_label == pair[1].label.replace(" ","_") and relation_label == pair[0].label.replace(" ","_"):
+                scored_hops.append(
+                    Hop(
+                        source=te,
+                        relation=pair[0],
+                        target=pair[1],
+                        hop_score=score
+                    )
+                )
+                break
+        
+    return scored_hops
 
 def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
     result = ""
@@ -138,16 +144,16 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, args, wiki_client, 
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}', extra={'session_key': session_key})
     return relation_entity_pairs
 
-def relation_entity_search_prune(entity_id, entity_name, question, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
                                  args, llm_logger, session_key
-                                 )-> List[Tuple[RelationEdge, TopicEntity]]:
+                                 )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
-    prompt = construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs, args)
+    prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, args)
     llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{prompt}', extra={'session_key': session_key})
     result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
-    return clean_relation_entity_pairs(result, entity_id, entity_name, relation_entity_pairs)
+    return clean_relation_entity_pairs(result, te, relation_entity_pairs)
 
 
 def break_question(question, entity_name, args, llm_logger, session_key):

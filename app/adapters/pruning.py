@@ -1,6 +1,6 @@
 from typing import List, Tuple, Optional
 import logging
-from app.core.models import TopicEntity, RelationEdge
+from app.core.models import TopicEntity, RelationEdge, Hop
 from app.wiki_func import relation_entity_search_prune
 from app.core.config import RunConfig
 
@@ -15,7 +15,7 @@ class Pruner:
         subq: str,
         te: TopicEntity,
         pairs: List[Tuple[RelationEdge, TopicEntity]],
-    ) -> List[Tuple[RelationEdge, TopicEntity]]:
+    ) -> List[Hop]:
         raise NotImplementedError
 
 
@@ -32,13 +32,13 @@ class LLMPruning(Pruner):
         te: TopicEntity,
         pairs: List[Tuple[RelationEdge, TopicEntity]],
         session_key: Optional[str] = None
-    ) -> List[Tuple[RelationEdge, TopicEntity]]:
+    ) -> List[Hop]:
         sk = session_key or "-"
 
         if not te.qid or not pairs:
-            return pairs
+            return [Hop(te, rel, ce, 0.0) for rel, ce in pairs]
         
-        pairs = relation_entity_search_prune(te.qid, te.label, subq, pairs, {
+        hops = relation_entity_search_prune(te, subq, pairs, {
                 "max_length": self.cfg.max_length,
                 "temperature_exploration": self.cfg.temperature_exploration,
                 "temperature_reasoning": self.cfg.temperature_reasoning,
@@ -48,9 +48,9 @@ class LLMPruning(Pruner):
                 "width": self.cfg.beam_width,
                 "remove_unnecessary_rel": self.cfg.remove_unnecessary_rel,
             }, logger, sk)
-        logger.debug(f"LLM pruning applied; pairs={len(pairs)}", extra={"session_key": sk})
+        logger.debug(f"LLM pruning applied; hops={len(hops)}", extra={"session_key": sk})
 
-        return pairs
+        return hops
 
 
 # (Optional) future: LLM-based pruning that reuses your 'relation_entity_search_prune'
