@@ -3,63 +3,6 @@ import json
 import time
 from openai import OpenAI
 import re
-# from rank_bm25 import BM25Okapi
-# from sentence_transformers import util
-# from sentence_transformers import SentenceTransformer
-
-# def retrieve_top_docs(query, docs, model, width=3):
-#     """
-#     Retrieve the topn most relevant documents for the given query.
-
-#     Parameters:
-#     - query (str): The input query.
-#     - docs (list of str): The list of documents to search from.
-#     - model_name (str): The name of the SentenceTransformer model to use.
-#     - width (int): The number of top documents to return.
-
-#     Returns:
-#     - list of float: A list of scores for the topn documents.
-#     - list of str: A list of the topn documents.
-#     """
-
-#     query_emb = model.encode(query)
-#     doc_emb = model.encode(docs)
-
-#     scores = util.dot_score(query_emb, doc_emb)[0].cpu().tolist()
-
-#     doc_score_pairs = sorted(list(zip(docs, scores)), key=lambda x: x[1], reverse=True)
-
-#     top_docs = [pair[0] for pair in doc_score_pairs[:width]]
-#     top_scores = [pair[1] for pair in doc_score_pairs[:width]]
-
-#     return top_docs, top_scores
-
-
-# def compute_bm25_similarity(query, corpus, width=3):
-#     """
-#     Computes the BM25 similarity between a question and a list of relations,
-#     and returns the topn relations with the highest similarity along with their scores.
-
-#     Args:
-#     - question (str): Input question.
-#     - relations_list (list): List of relations.
-#     - width (int): Number of top relations to return.
-
-#     Returns:
-#     - list, list: topn relations with the highest similarity and their respective scores.
-#     """
-
-#     tokenized_corpus = [doc.split(" ") for doc in corpus]
-#     bm25 = BM25Okapi(tokenized_corpus)
-#     tokenized_query = query.split(" ")
-
-#     doc_scores = bm25.get_scores(tokenized_query)
-    
-#     relations = bm25.get_top_n(tokenized_query, corpus, n=width)
-#     doc_scores = sorted(doc_scores, reverse=True)[:width]
-
-#     return relations, doc_scores
-
 
 def clean_relations(string, entity_id, head_relations):
     pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
@@ -86,20 +29,6 @@ def clean_relations(string, entity_id, head_relations):
 
 def if_all_zero(topn_scores):
     return all(score == 0 for score in topn_scores)
-
-
-# def clean_relations_bm25_sent(topn_relations, topn_scores, entity_id, head_relations):
-#     relations = []
-#     if if_all_zero(topn_scores):
-#         topn_scores = [float(1/len(topn_scores))] * len(topn_scores)
-#     i=0
-#     for relation in topn_relations:
-#         if relation in head_relations:
-#             relations.append({"entity": entity_id, "relation": relation, "score": topn_scores[i], "head": True})
-#         else:
-#             relations.append({"entity": entity_id, "relation": relation, "score": topn_scores[i], "head": False})
-#         i+=1
-#     return True, relations
 
 
 def run_llm(
