@@ -7,7 +7,7 @@ import re
 from typing import Optional, Dict, Any
 
 
-def clean_relations(string, entity_id, head_relations):
+def clean_relations(string, entity_id):
     pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
     relations=[]
     for match in re.finditer(pattern, string):
@@ -21,10 +21,7 @@ def clean_relations(string, entity_id, head_relations):
             score = float(score)
         except ValueError:
             return False, "Invalid score"
-        if relation in head_relations:
-            relations.append({"entity": entity_id, "relation": relation, "score": score, "head": True})
-        else:
-            relations.append({"entity": entity_id, "relation": relation, "score": score, "head": False})
+        relations.append({"entity": entity_id, "relation": relation, "score": score, "head": False})
     if not relations:
         return False, "No relations found"
     return True, relations
