@@ -174,7 +174,11 @@ def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity
     # Now we prompt the LLM to prune and score these relation-entity pairs
     prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, configs)
     llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, configs.temperature_exploration, configs.max_length, configs.openai_api_key, configs.llm_type)
+    result = run_llm(user_prompt=prompt,
+                     temperature=configs.temperature_exploration,
+                     max_tokens=configs.max_length,
+                     openai_api_keys=configs.openai_api_key,
+                     engine=configs.llm_type)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
     return clean_relation_entity_pairs(result, te, relation_entity_pairs)
@@ -183,7 +187,11 @@ def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity
 def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger, session_key):
     prompt = construct_break_question_prompt(question, entity_name)
     llm_logger.debug(f'break_question prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, configs.temperature_exploration, configs.max_length, configs.openai_api_key, configs.llm_type)
+    result = run_llm(user_prompt=prompt,
+                     temperature=configs.temperature_exploration,
+                     max_tokens=configs.max_length,
+                     openai_api_keys=configs.openai_api_key,
+                     engine=configs.llm_type)
     llm_logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
     flag, sub_questions = clean_sub_questions(result)
     llm_logger.debug(f'clean_sub_questions:\n{sub_questions}', extra={'session_key': session_key})
@@ -235,7 +243,11 @@ def te_r_ce_score(te_r_ce_list, sub_question, configs: RunConfig, llm_logger, se
     prompt = construct_te_r_ce_prune_prompt(sub_question, te_r_ce_list)
     
     llm_logger.debug(f'te_r_ce prune prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, configs.temperature_exploration, configs.max_length, configs.openai_api_key, configs.llm_type)
+    result = run_llm(user_prompt=prompt,
+                     temperature=configs.temperature_exploration,
+                     max_tokens=configs.max_length,
+                     openai_api_keys=configs.openai_api_key,
+                     engine=configs.llm_type)
     llm_logger.debug(f'raw result for te_r_ce_score:\n{result}', extra={'session_key': session_key})
     flag, scored_pairs = clean_te_r_ce_triplets(result, te_r_ce_list)
     llm_logger.debug(f'clean_te_r_ce scores:\n{scored_pairs}', extra={'session_key': session_key})
@@ -268,7 +280,11 @@ def generate_answer(question, walker, configs: RunConfig, llm_logger, session_ke
     prompt = half_stop_prompt + question + '\n'
     prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
-    result = run_llm(prompt, configs.temperature_reasoning, configs.max_length, configs.openai_api_key, configs.llm_type)
+    result = run_llm(user_prompt=prompt,
+                     temperature=configs.temperature_exploration,
+                     max_tokens=configs.max_length,
+                     openai_api_keys=configs.openai_api_key,
+                     engine=configs.llm_type)
     llm_logger.debug(f"Final answer:{result}", extra={'session_key': session_key})
     return result
 
