@@ -98,9 +98,9 @@ def clean_scores(string, entity_candidates):
         return [1/len(entity_candidates)] * len(entity_candidates)
     
 
-def save_2_json(question, answer, walker, file_name):
-    dict = {"question":question, "results": answer, "reasoning_chains": walker.print_paths() if walker is not list else []}
-    with open("ToG_{}.json".format(file_name), "a") as outfile:
+def save_2_json(data_id, question, results, paths, file_name):
+    dict = {"id": data_id, "question":question, "results": results, "reasoning_chains": paths}
+    with open(f"ToG_{file_name}.json", "a") as outfile:
         json_str = json.dumps(dict)
         outfile.write(json_str + "\n")
 
@@ -142,39 +142,48 @@ def prepare_dataset(dataset_name):
         with open('./data/cwq.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
+        id_string = 'ID'
     elif dataset_name == 'webqsp':
         with open('../data/WebQSP.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'RawQuestion'
+        id_string = 'QuestionId'
     elif dataset_name == 'grailqa':
         with open('../data/grailqa.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
+        id_string = None
     elif dataset_name == 'simpleqa':
         with open('../data/SimpleQA.json',encoding='utf-8') as f:
             datas = json.load(f)    
         question_string = 'question'
+        id_string = None
     elif dataset_name == 'qald':
         with open('../data/qald_10-en.json',encoding='utf-8') as f:
             datas = json.load(f) 
         question_string = 'question'   
+        id_string = None
     elif dataset_name == 'webquestions':
         with open('../data/WebQuestions.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
+        id_string = None
     elif dataset_name == 'trex':
         with open('../data/T-REX.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'input'    
+        id_string = None
     elif dataset_name == 'zeroshotre':
         with open('../data/Zero_Shot_RE.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'input'    
+        id_string = None
     elif dataset_name == 'creak':
         with open('../data/creak.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'sentence'
+        id_string = 'ex_id'
     else:
         print("dataset not found, you should pick from {cwq, webqsp, grailqa, simpleqa, qald, webquestions, trex, zeroshotre, creak}.")
         exit(-1)
-    return datas, question_string
+    return datas, question_string, id_string

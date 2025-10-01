@@ -27,7 +27,7 @@ def main():
     cfg = RunConfig()
     cfg.validate()
 
-    data_rows, question_key = prepare_dataset(cfg.dataset)
+    data_rows, question_key, id_key = prepare_dataset(cfg.dataset)
     logger.info(f"\'{cfg.dataset}\' dataset loaded rows={len(data_rows)}", extra={"session_key": session_key})
 
     # 2) construct adapters (thin wrappers around your existing code)
@@ -48,7 +48,7 @@ def main():
     #    you can wrap this in argparse to pick indices/limits.
     for idx, row in enumerate(data_rows[19:20]):
         main_q = row[question_key]
-
+        data_id = row[id_key]
         # initial topic entities: dict of {qid: label}
         initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
         if not initial_map:
@@ -74,13 +74,13 @@ def main():
         # 6) persist output (adapt your save_2_json to new structure)
         #    If you keep the old signature, write a small shim to convert
         #    PathResult branches into the walker/paths format you used before.
-        answer = result["answer"]               # whatever your Reasoner returns
+        answer = result["answer"]               # return answer={ok:bool, answer:str}
         path_results = result["paths"]          # list of PathResult
 
         # EXAMPLE: save final answer + evidence (adjust to your serializer)
         try:
             ## need some change
-            # save_2_json(question=main_q, results=answer, paths=path_results, file_name=dataset_name)
+            save_2_json(data_id, question=main_q, results=answer, paths=path_results, file_name=cfg.dataset)
             logger.info(f"row_saved idx={idx}", extra={"session_key": session_key})
         except Exception:
             logger.exception(f"save_failed row={idx}", extra={"session_key": session_key})
