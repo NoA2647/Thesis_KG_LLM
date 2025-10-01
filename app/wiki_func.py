@@ -289,10 +289,18 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
 
 
 def reasoning(question, walker, configs: RunConfig, llm_logger, session_key):
-    prompt = reasoning_prompt + question
-    prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
-    llm_logger.debug(f'reasoning prompt:\n{prompt}', extra={'session_key': session_key})
-    response = run_llm(prompt, configs.temperature_reasoning, configs.max_length, configs.openai_api_key, configs.llm_type)
+    sys_prompt = reasoning_sys_prompt
+    user_prompt = reasoning_user_prompt % (question, walker.format_for_llm())
+    
+    llm_logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
+    response = run_llm(
+        user_prompt=user_prompt,
+        temperature=configs.temperature_reasoning,
+        max_tokens=configs.max_length,
+        openai_api_keys=configs.openai_api_key,
+        engine=configs.llm_type,
+        sys_prompt=sys_prompt
+    )
     llm_logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
     result = extract_answer(response)
     llm_logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})
