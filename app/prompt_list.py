@@ -55,27 +55,39 @@ Relation-Entity Pairs:
 """
 
 # give correct outpute format for evaluation (@Yes/No@ and @Answer@)
-reasoning_prompt="""Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer whether it's sufficient for you to answer the question with these triplets and your knowledge. give output in this format:
-@True/False@. @Explanation@. Therefore, the answer to the question is @Answer@
-for example:
+reasoning_sys_prompt="""You are an assistant that evaluates if retrieved knowledge graph triplets are sufficient to answer a question. 
+
+Rules:
+1. First decide if the triplets are sufficient.
+2. If sufficient, output: @True@. @Explanation@. Therefore, the answer to the question is @Answer@
+3. If not sufficient, output: @False@. @Explanation@. Therefore, the answer to the question is @No Answer@
+4. Never output anything outside this format.
+
+Examples:
+
 Q: Viscount Yamaji Motoharu was a general in the early Imperial Japanese Army which belonged to which Empire?
-Knowledge Triplets: Imperial Japanese Army, allegiance, Emperor of Japan
+Knowledge Triplets:
+Imperial Japanese Army, allegiance, Emperor of Japan
 Yamaji Motoharu, allegiance, Emperor of Japan
 Yamaji Motoharu, military rank, general
-A: @True@. @Based on the given knowledge triplets and my knowledge, Viscount Yamaji Motoharu, who was a general in the early Imperial Japanese Army, belonged to the Empire of Japan@. Therefore, the answer to the question is @Empire of Japan@.
+A: @True@. @Based on the given triplets, Yamaji Motoharu, who was a general in the Imperial Japanese Army, belonged to the Empire of Japan@. Therefore, the answer to the question is @Empire of Japan@.
 
 Q: Who is the coach of the team owned by Steve Bisciotti?
-Knowledge Triplets: psilocybin, described by source, Opium Law,
+Knowledge Triplets: 
+psilocybin, described by source, Opium Law,
 psilocybin, found in taxon, Gymnopilus purpuratus,
 psilocybin, found in taxon, Gymnopilus spectabilis, 
 Opium Law, part of, norcodeine (stereochemistry defined), 
 Gymnopilus purpuratus, edibility, psychoactive mushroom,
 Gymnopilus spectabilis, parent taxon, Gymnopilus
-A: @False@. @Based on the given knowledge triplets and my knowledge, the specific psychedelic compound found in the Psilocybin genus mushroom that is converted to psilocin by the body is not explicitly mentioned@.
-now the question is:
-
+A: @False@. @The triplets only describe chemical and biological relationships of psilocybin, and provide no information about Steve Bisciotti, his team, or its coach@. Therefore, the answer to the question is @No Answer@
 """
-
+reasoning_user_prompt = """
+Q: %s
+Knowledge Triplets:
+%s
+A:
+"""
 half_stop_prompt = """Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your own knowledge.
 @Explanation@. Therefore, the answer to the question is @Answer/need_information@
 for example:
