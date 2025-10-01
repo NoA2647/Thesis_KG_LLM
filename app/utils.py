@@ -102,10 +102,14 @@ def clean_scores(string, entity_candidates):
     
 
 def save_2_json(data_id, question, results, paths, file_name):
-    dict = {"id": data_id, "question":question, "results": results, "reasoning_chains": paths}
-    with open(f"ToG_{file_name}.json", "a") as outfile:
-        json_str = json.dumps(dict)
-        outfile.write(json_str + "\n")
+    payload = {
+        "id": data_id,
+        "question": question,
+        "answer": results,
+        "paths": [p.to_dict() for p in paths],
+    }
+    with open(f"ToG_{file_name}.json", "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
 def extract_answer(text: str) -> Optional[Dict[str, Any]]:

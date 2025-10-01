@@ -14,6 +14,13 @@ class TopicEntity:
     qid: Optional[str]
     label: str
     is_value: bool = False
+    
+    def to_dict(self):
+        return {
+            "qid": self.qid,
+            "label": self.label,
+            "is_value": self.is_value
+        }
 
 @dataclass(slots=True)
 class RelationEdge:
@@ -26,6 +33,12 @@ class RelationEdge:
     
     pid: Optional[str]
     label: str
+    
+    def to_dict(self):
+        return {
+            "pid": self.pid,
+            "label": self.label
+        }
 
 @dataclass(slots=True)
 class Hop:
@@ -37,6 +50,14 @@ class Hop:
     relation: RelationEdge
     target: TopicEntity
     hop_score: float = 0.0
+    
+    def to_dict(self):
+        return {
+            "source": self.source.to_dict(),
+            "relation": self.relation.to_dict(),
+            "target": self.target.to_dict(),
+            "hop_score": self.hop_score
+        }
 
 @dataclass(slots=True)
 class Branch:
@@ -53,6 +74,14 @@ class Branch:
     frontier: TopicEntity = field(default_factory=lambda: TopicEntity(qid=None, label=""))
     cum_score: float = 0.0
     alive: bool = True
+    
+    def to_dict(self):
+        return {
+            "history": [h.to_dict() for h in self.history],
+            "frontier": self.frontier.to_dict(),
+            "cum_score": self.cum_score,
+            "alive": self.alive
+        }
     
     def last_hop(self) -> Optional[Hop]:
         return self.history[-1] if self.history[-1] else None
@@ -77,6 +106,16 @@ class PathState:
     beam: List[Branch] = field(default_factory=list)
     finished: bool = False
     
+    def to_dict(self):
+        return {
+            "path_id": self.path_id,
+            "initial": self.initial.to_dict(),
+            "subqs": self.subqs,
+            "step_index": self.step_index,
+            "beam": [b.to_dict() for b in self.beam],
+            "finished": self.finished
+        }
+    
 @dataclass(slots=True)
 class PathResult:
     """
@@ -87,3 +126,11 @@ class PathResult:
     initial: TopicEntity
     subqs: List[str]
     final_branches: List[Branch] = field(default_factory=list)
+    
+    def to_dict(self):
+        return {
+            "path_id": self.path_id,
+            "initial": self.initial.to_dict(),
+            "subqs": self.subqs,
+            "final_branches": [b.to_dict() for b in self.final_branches],
+        }
