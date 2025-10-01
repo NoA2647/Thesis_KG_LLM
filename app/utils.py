@@ -4,6 +4,8 @@ import time
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 import re
+from typing import Optional, Dict, Any
+
 
 def clean_relations(string, entity_id, head_relations):
     pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
@@ -106,23 +108,54 @@ def save_2_json(data_id, question, results, paths, file_name):
         outfile.write(json_str + "\n")
 
 
-def extract_answer(text):
-    pattern = r"@(True|False)@\.\s*@(.*?)@(?:\.\s*Therefore, the answer to the question is @(.*?)@)?"
-
-    match = re.match(pattern, text)
-    if match:
-        answered = match.group(1) if match.group(1) else False
-        explanation = match.group(2)
-        answer = match.group(3) if match.group(3) else None
-        return {
-            "answered":answered,
-            "explanation": explanation,
-            "answer": answer
-        }
-    else:
+def extract_answer(text: str) -> Optional[Dict[str, Any]]:
+    if not text:
         return None
-    
 
+    # Be permissive about whitespace and case; explanation can be multiline.
+    # Pattern captures:
+    #  1) True/False
+    #  2) Explanation (non-greedy, between @...@)
+    #  3) Answer (optional group, between @...@ after the "Therefore..." clause)
+    pattern = (
+        r"@\s*(True|False)\s*@\.\s*@"          # @True@. or @False@.
+        r"(?P<exp>.*?)"                        # explanation
+        r"@\s*\.\s*Therefore,\s*the\s*answer\s*to\s*the\s*question\s*is\s*@"
+        r"(?P<ans>.*?)"                        # answer
+        r"@\s*\.?"                             # closing @ and optional trailing period
+    )
+
+    m = re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL)
+    if not m:
+        # Fallback: handle cases where the model omitted the final clause
+        fallback_pattern = r"@\s*(True|False)\s*@\.\s*@(?P<exp>.*?)@"
+        m2 = re.search(fallback_pattern, text, flags=re.IGNORECASE | re.DOTALL)
+        if not m2:
+            return None
+        answered_raw = m2.group(1).strip().lower()
+        explanation = m2.group("exp").strip()
+        answered = True if answered_raw == "true" else False
+        # No explicit answer found
+        return {
+            "answered": answered,
+            "explanation": explanation,
+            "answer": None
+        }
+
+    answered_raw = m.group(1).strip().lower()
+    explanation = m.group("exp").strip()
+    answer_raw = (m.group("ans") or "").strip()
+
+    answered = True if answered_raw == "true" else False
+
+    answer = answer_raw
+
+    return {
+        "answered": answered,
+        "explanation": explanation,
+        "answer": answer
+    }
+    
 
 def generate_without_explored_paths(question, args):
     prompt = cot_prompt + "\n\nQ: " + question + "\nA:"

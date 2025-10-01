@@ -82,12 +82,14 @@ Gymnopilus purpuratus, edibility, psychoactive mushroom,
 Gymnopilus spectabilis, parent taxon, Gymnopilus
 A: @False@. @The triplets only describe chemical and biological relationships of psilocybin, and provide no information about Steve Bisciotti, his team, or its coach@. Therefore, the answer to the question is @No Answer@
 """
+
 reasoning_user_prompt = """
 Q: %s
 Knowledge Triplets:
 %s
 A:
 """
+
 half_stop_prompt = """Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your own knowledge.
 @Explanation@. Therefore, the answer to the question is @Answer/need_information@
 for example:
