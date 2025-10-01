@@ -40,15 +40,7 @@ class LLMReasoner(Reasoner):
         ok, answer = legacy_reasoning(
             question=main_q,
             walker=walker_shim,
-            args={
-                "max_length": self.cfg.max_length,
-                "temperature_exploration": self.cfg.temperature_exploration,
-                "temperature_reasoning": self.cfg.temperature_reasoning,
-                "LLM_type": self.cfg.llm_type,
-                "opeani_api_keys": self.cfg.openai_api_key,
-                # the rest are ignored downstream
-                "width": self.cfg.beam_width,
-            },
+            configs=self.cfg,
             llm_logger=logger,
             session_key=session_key,
         )

@@ -3,6 +3,7 @@ import re
 from app.utils import *
 from typing import List, Tuple
 from app.core.models import TopicEntity, RelationEdge, Hop
+from app.core.config import RunConfig
 def transform_relation(relation):
     relation_without_prefix = relation.replace("wiki.relation.", "").replace("_", " ")
     return relation_without_prefix
@@ -114,13 +115,13 @@ def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
     
     return prompt_str
 
-def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], args):
+def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
     result = ""
     for idx, pair in enumerate(relation_entity_pairs, start=1):
         if pair[1].qid != None:
             result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n"
             
-    prompt_str = extract_relation_entity_prompt %(entity_name, args['width'], question, result) 
+    prompt_str = extract_relation_entity_prompt %(entity_name, configs.beam_width, question, result) 
     
     return prompt_str
 
@@ -141,12 +142,12 @@ def abandon_rels(relation):
     return False
 
 
-def retrieve_relation_entity_pairs(entity_id, pre_relations, args, wiki_client, llm_logger, session_key):
+def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig, wiki_client, llm_logger, session_key):
     # Retrieve all relations for the current entity
     relations = wiki_client.get_all_relations_of_an_entity(entity_id)
     head_relations = [rel['label'] for rel in relations]
     
-    if args['remove_unnecessary_rel']:
+    if configs.remove_unnecessary_rel:
         head_relations = [relation for relation in head_relations if not abandon_rels(relation)]
     head_relations = list(set(head_relations) - set(pre_relations))
     
@@ -168,21 +169,21 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, args, wiki_client, 
     return relation_entity_pairs
 
 def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
-                                 args, llm_logger, session_key
+                                 configs: RunConfig, llm_logger, session_key
                                  )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
-    prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, args)
+    prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, configs)
     llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
+    result = run_llm(prompt, configs.temperature_exploration, configs.max_length, configs.openai_api_key, configs.llm_type)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
     return clean_relation_entity_pairs(result, te, relation_entity_pairs)
 
 
-def break_question(question, entity_name, args, llm_logger, session_key):
+def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger, session_key):
     prompt = construct_break_question_prompt(question, entity_name)
     llm_logger.debug(f'break_question prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
+    result = run_llm(prompt, configs.temperature_exploration, configs.max_length, configs.openai_api_key, configs.llm_type)
     llm_logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
     flag, sub_questions = clean_sub_questions(result)
     llm_logger.debug(f'clean_sub_questions:\n{sub_questions}', extra={'session_key': session_key})
@@ -226,7 +227,7 @@ def entity_search(entity_qid, relation_label, wiki_client):
 
 # replace of entity_score
 # (current_TE_R_CE_list, sub_question, arges(width), llm_logger, session_key)
-def te_r_ce_score(te_r_ce_list, sub_question, args, llm_logger, session_key):
+def te_r_ce_score(te_r_ce_list, sub_question, configs: RunConfig, llm_logger, session_key):
     if len(te_r_ce_list) == 1:
         return te_r_ce_list
 
@@ -234,7 +235,7 @@ def te_r_ce_score(te_r_ce_list, sub_question, args, llm_logger, session_key):
     prompt = construct_te_r_ce_prune_prompt(sub_question, te_r_ce_list)
     
     llm_logger.debug(f'te_r_ce prune prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(prompt, args['temperature_exploration'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
+    result = run_llm(prompt, configs.temperature_exploration, configs.max_length, configs.openai_api_key, configs.llm_type)
     llm_logger.debug(f'raw result for te_r_ce_score:\n{result}', extra={'session_key': session_key})
     flag, scored_pairs = clean_te_r_ce_triplets(result, te_r_ce_list)
     llm_logger.debug(f'clean_te_r_ce scores:\n{scored_pairs}', extra={'session_key': session_key})
@@ -257,27 +258,27 @@ def update_history(entity_candidates, entity, scores, entity_candidates_id, tota
     return total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head
 
 
-def half_stop(question, walker, depth, args, llm_logger, session_key):
+def half_stop(question, walker, depth, configs: RunConfig, llm_logger, session_key):
     llm_logger.debug("No new knowledge added during search depth %d, stop searching." % depth, extra={'session_key': session_key})
-    answer = generate_answer(question, walker, args, llm_logger, session_key)
-    save_2_json(question, answer, walker, file_name=args['dataset'])
+    answer = generate_answer(question, walker, configs, llm_logger, session_key)
+    save_2_json("2", question, answer, walker, file_name=configs.dataset)
 
 
-def generate_answer(question, walker, args, llm_logger, session_key): 
+def generate_answer(question, walker, configs: RunConfig, llm_logger, session_key): 
     prompt = half_stop_prompt + question + '\n'
     prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
-    result = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
+    result = run_llm(prompt, configs.temperature_reasoning, configs.max_length, configs.openai_api_key, configs.llm_type)
     llm_logger.debug(f"Final answer:{result}", extra={'session_key': session_key})
     return result
 
 
-def entity_prune(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_scores, args):
+def entity_prune(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_scores, configs: RunConfig):
     zipped = list(zip(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_scores))
     sorted_zipped = sorted(zipped, key=lambda x: x[-1], reverse=True)
     sorted_entities_id, sorted_relations, sorted_candidates, sorted_topic_entities, sorted_topic_entities_label, sorted_scores = [x[0] for x in sorted_zipped], [x[1] for x in sorted_zipped], [x[2] for x in sorted_zipped], [x[3] for x in sorted_zipped], [x[4] for x in sorted_zipped], [x[5] for x in sorted_zipped]
 
-    entities_id, relations, candidates, topics, topics_label, scores = sorted_entities_id[:args['width']], sorted_relations[:args['width']], sorted_candidates[:args['width']], sorted_topic_entities[:args['width']], sorted_topic_entities_label[:args['width']], sorted_scores[:args['width']]
+    entities_id, relations, candidates, topics, topics_label, scores = sorted_entities_id[:configs.beam_width], sorted_relations[:configs.beam_width], sorted_candidates[:configs.beam_width], sorted_topic_entities[:configs.beam_width], sorted_topic_entities_label[:configs.beam_width], sorted_scores[:configs.beam_width]
     merged_list = list(zip(entities_id, relations, candidates, topics, topics_label, scores))
     filtered_list = [(id, rel, ent, top, topl, score) for id, rel, ent, top, topl, score in merged_list if score != 0]
     if len(filtered_list) ==0:
@@ -287,11 +288,11 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
     return True, cluster_chain_of_entities, entities_id, relations
 
 
-def reasoning(question, walker, args, llm_logger, session_key):
+def reasoning(question, walker, configs: RunConfig, llm_logger, session_key):
     prompt = reasoning_prompt + question
     prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f'reasoning prompt:\n{prompt}', extra={'session_key': session_key})
-    response = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
+    response = run_llm(prompt, configs.temperature_reasoning, configs.max_length, configs.openai_api_key, configs.llm_type)
     llm_logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
     result = extract_answer(response)
     llm_logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})

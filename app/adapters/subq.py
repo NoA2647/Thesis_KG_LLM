@@ -29,16 +29,7 @@ class LLMSubQGenerator(SubQGenerator):
             subs = break_question(
                 question=main_q,
                 entity_name=initial.label,
-                args={
-                    "max_length": self.cfg.max_length,
-                    "temperature_exploration": self.cfg.temperature_exploration,
-                    "temperature_reasoning": self.cfg.temperature_reasoning,
-                    "LLM_type": self.cfg.llm_type,
-                    "opeani_api_keys": self.cfg.openai_api_key,  # keep your current key name for compatibility
-                    # fields below are ignored by break_question but harmless
-                    "width": self.cfg.beam_width,
-                    "remove_unnecessary_rel": self.cfg.remove_unnecessary_rel,
-                },
+                configs=self.cfg,
                 llm_logger=logger,
                 session_key=session_key,
             )

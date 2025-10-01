@@ -68,22 +68,17 @@ def main():
             result = pipeline.run(main_question=main_q, initial_entities=initial_entities, session_key=session_key)
             # result = {"answer": {...}, "paths": [PathResult, ...]}
         except Exception as e:
-            logger.exception(f"pipeline_failed row={idx}", extra={"session_key": session_key})
+            logger.exception(f"pipeline_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
             continue
 
-        # 6) persist output (adapt your save_2_json to new structure)
-        #    If you keep the old signature, write a small shim to convert
-        #    PathResult branches into the walker/paths format you used before.
         answer = result["answer"]               # return answer={ok:bool, answer:str}
         path_results = result["paths"]          # list of PathResult
 
-        # EXAMPLE: save final answer + evidence (adjust to your serializer)
         try:
-            ## need some change
             save_2_json(data_id, question=main_q, results=answer, paths=path_results, file_name=cfg.dataset)
-            logger.info(f"row_saved idx={idx}", extra={"session_key": session_key})
+            logger.info(f"row_saved idx={idx}, data_id={data_id}", extra={"session_key": session_key})
         except Exception:
-            logger.exception(f"save_failed row={idx}", extra={"session_key": session_key})
+            logger.exception(f"save_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
 
     logger.info("run_done", extra={"session_key": session_key})
 
