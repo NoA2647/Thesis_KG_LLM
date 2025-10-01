@@ -2,6 +2,7 @@ from app.prompt_list import *
 import json
 import time
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 import re
 
 def clean_relations(string, entity_id, head_relations):
@@ -32,12 +33,12 @@ def if_all_zero(topn_scores):
 
 
 def run_llm(
-    prompt: str,
+    user_prompt: str,
     temperature: float,
     max_tokens: int,
     openai_api_keys: str,
+    sys_prompt: str = "You are an AI assistant that helps people find information.",
     engine: str = "llama3",
-    system_prompt: str = "You are an AI assistant that helps people find information.",
     frequency_penalty: float = 0.0,
     presence_penalty: float = 0.0,
     retries: int = 3,
@@ -54,9 +55,9 @@ def run_llm(
             api_key=openai_api_keys,
         )
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
+    messages: list[ChatCompletionMessageParam]= [
+        {"role": "system", "content": sys_prompt},
+        {"role": "user", "content": user_prompt}
     ]
 
     for attempt in range(retries):
@@ -69,7 +70,7 @@ def run_llm(
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or ""
         except Exception as e:
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(retry_delay)
