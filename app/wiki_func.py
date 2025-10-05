@@ -85,10 +85,6 @@ def construct_relation_entity_prune_prompt(question, entity_name, relation_entit
     return prompt_str
 
 
-def construct_break_question_prompt(question, entity_name):
-    return BREAK_QUESTION_PROMPT_V2 % (entity_name, question, question, entity_name)
-
-
 def check_end_word(s):
     words = [" ID", " code", " number", "instance of", "website", "URL", "inception", "image", " rate", " count"]
     return any(s.endswith(word) for word in words)
@@ -145,12 +141,13 @@ def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity
 
 
 def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger, session_key):
-    prompt = construct_break_question_prompt(question, entity_name)
-    llm_logger.debug(f'break_question prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(user_prompt=prompt,
+    user_prompt = BREAK_QUESTION_USER_PROMPT % (question, entity_name)
+    llm_logger.debug(f'break_question prompt:\n{user_prompt}', extra={'session_key': session_key})
+    result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
                      openai_api_keys=configs.openai_api_key,
+                     sys_prompt=BREAK_QUESTION_SYS_PROMPT,
                      engine=configs.llm_type)
     llm_logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
     flag, sub_questions = clean_sub_questions(result)
@@ -207,25 +204,6 @@ def update_history(entity_candidates, entity, scores, entity_candidates_id, tota
     total_topic_entities.extend(topic_entities)
     total_head.extend(head_num)
     return total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head
-
-
-def half_stop(question, walker, depth, configs: RunConfig, llm_logger, session_key):
-    llm_logger.debug("No new knowledge added during search depth %d, stop searching." % depth, extra={'session_key': session_key})
-    answer = generate_answer(question, walker, configs, llm_logger, session_key)
-    save_2_json("2", question, answer, walker, file_name=configs.dataset)
-
-
-def generate_answer(question, walker, configs: RunConfig, llm_logger, session_key): 
-    prompt = HALF_STOP_PROMPT + question + '\n'
-    prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
-    llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
-    result = run_llm(user_prompt=prompt,
-                     temperature=configs.temperature_exploration,
-                     max_tokens=configs.max_length,
-                     openai_api_keys=configs.openai_api_key,
-                     engine=configs.llm_type)
-    llm_logger.debug(f"Final answer:{result}", extra={'session_key': session_key})
-    return result
 
 
 def entity_prune(total_entities_id, total_relations, total_candidates, total_topic_entities, topic_entities_label, total_scores, configs: RunConfig):
