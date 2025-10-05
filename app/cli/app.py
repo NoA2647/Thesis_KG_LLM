@@ -51,25 +51,27 @@ def main():
         data_id = row[id_key]
         # initial topic entities: dict of {qid: label}
         initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
+        initial_map = {}
         if not initial_map:
-            logger.warning(f"no_initial_entities row={idx}; skipping", extra={"session_key": session_key})
-            continue
+            logger.warning(f"no_initial_entities row={idx}; COT generating", extra={"session_key": session_key})
+            result = reasoner.cot(main_q=main_q, session_key=session_key)
         
-        initial_entities = [
-            TopicEntity(qid=qid, label=label, is_value=False)
-            for qid, label in initial_map.items()
-        ]
-        
-        logger.info(f"row_start idx={idx} initials={len(initial_entities)} qlen={len(main_q)}",
-                    extra={"session_key": session_key})
+        else:
+            initial_entities = [
+                TopicEntity(qid=qid, label=label, is_value=False)
+                for qid, label in initial_map.items()
+            ]
+            
+            logger.info(f"row_start idx={idx} initials={len(initial_entities)} qlen={len(main_q)}",
+                        extra={"session_key": session_key})
 
-        # 5) run the pipeline (per-path independent beams → reasoning)
-        try:
-            result = pipeline.run(main_question=main_q, initial_entities=initial_entities, session_key=session_key)
-            # result = {"answer": {...}, "paths": [PathResult, ...]}
-        except Exception as e:
-            logger.exception(f"pipeline_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
-            continue
+            # 5) run the pipeline (per-path independent beams → reasoning)
+            try:
+                result = pipeline.run(main_question=main_q, initial_entities=initial_entities, session_key=session_key)
+                # result = {"answer": {...}, "paths": [PathResult, ...]}
+            except Exception as e:
+                logger.exception(f"pipeline_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
+                continue
 
         answer = result["answer"]               # return answer={ok:bool, answer:{"answered": answered,"explanation": explanation,"answer": answer}}
         path_results = result["paths"]          # list of PathResult
