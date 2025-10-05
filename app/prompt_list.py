@@ -1,33 +1,15 @@
-BREAK_QUESTION_PROMPT_V1 = """
-break this question into multi-hop questions, first i give you an example then the question.
-Example Question: 
-"What is the predominant religion where the leader is Ovadia Yosef?" with initial node: "Ovadia Yosef".
-Example Answer:
-"Step 1: Who is Ovadia Yosef?
+BREAK_QUESTION_SYS_PROMPT="""
+You are an intelligent reasoning assistant that helps to decompose multi-hop questions into step-by-step sub-questions for exploration on a knowledge graph (KG).  
+You are given:
+- A *main question*.
+- A *current node* in the KG that the system already knows about.
 
-(Identify who Ovadia Yosef is, such as his background, role, and significance in a particular community.)
+Your task:
+- Break down the main question into a logical sequence of smaller sub-questions (steps), starting from the current node.
+- Do **not** ask about the current node itself — its information is already known.
+- Each sub-question should guide reasoning through the KG step-by-step toward answering the main question.
 
-Step 2: What religious or spiritual role did Ovadia Yosef hold?
-
-(Determine Ovadia Yosef's religious position, such as whether he was a religious leader, scholar, or figure in a specific faith.)
-
-Step 3: What is the predominant religion associated with Ovadia Yosef's leadership?
-
-(Identify the religion in which Ovadia Yosef was a leader, determining the community or faith group he influenced.)
-
-By first identifying Ovadia Yosef's background, you can trace his religious significance and then identify the predominant religion associated with his leadership."
-
-Now the main question: 
-"%s" with initial node: "%s"
-"""
-
-
-# check model dont generate useless question (especially first question)
-BREAK_QUESTION_PROMPT_V2='''
-I have a knowledge graph and I have the current node "%s" and I already know the information about this node so don't ask about this node. Break down the question "%s" into multi-hop sub-questions, starting from the current node.
-
-Here’s an example of the expected output format:
-
+Use the example format provided below to structure your response clearly.
 Example Question:
 "What is the predominant religion where the leader is Ovadia Yosef?" with current node: "Ovadia Yosef"
 
@@ -38,12 +20,14 @@ Step 1: What religious or spiritual role did Ovadia Yosef hold?
 Step 2: What is the predominant religion associated with Ovadia Yosef's leadership?
 (Identify the religion in which Ovadia Yosef was a leader, determining the community or faith group he influenced.)
 
-Now, for the main question:
-"%s" with current node: "%s"
-'''
+"""
 
 
-# give correct outpute format for evaluation (@Yes/No@ and @Answer@)
+BREAK_QUESTION_USER_PROMPT="""
+main question: "%s" with current node: "%s"
+"""
+
+
 REASONING_SYS_PROMPT="""You are an assistant that evaluates if retrieved knowledge graph triplets are sufficient to answer a question. 
 
 Rules:
@@ -79,27 +63,6 @@ Knowledge Triplets:
 %s
 A:
 """
-
-
-HALF_STOP_PROMPT = """Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your own knowledge.
-@Explanation@. Therefore, the answer to the question is @Answer/need_information@
-for example:
-Q: Viscount Yamaji Motoharu was a general in the early Imperial Japanese Army which belonged to which Empire?
-Knowledge Triplets: Imperial Japanese Army, allegiance, Emperor of Japan
-Yamaji Motoharu, allegiance, Emperor of Japan
-Yamaji Motoharu, military rank, general
-A: Based on the given knowledge triplets and my knowledge, Viscount Yamaji Motoharu, who was a general in the early Imperial Japanese Army, belonged to the Empire of Japan. Therefore, the answer to the question is {Empire of Japan}.
-
-Q: Who is the coach of the team owned by Steve Bisciotti?
-Knowledge Triplets: psilocybin, described by source, Opium Law,
-psilocybin, found in taxon, Gymnopilus purpuratus,
-psilocybin, found in taxon, Gymnopilus spectabilis, 
-Opium Law, part of, norcodeine (stereochemistry defined), 
-Gymnopilus purpuratus, edibility, psychoactive mushroom,
-Gymnopilus spectabilis, parent taxon, Gymnopilus
-A: Based on the given knowledge triplets and my knowledge, the specific psychedelic compound found in the Psilocybin genus mushroom that is converted to psilocin by the body is not explicitly mentioned. Therefore, additional knowledge about the specific compounds and their conversion to psilocin is required to answer the question.
-
-Q: """
 
 
 COT_SYS_PROMPT = """
