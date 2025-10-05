@@ -1,4 +1,4 @@
-break_question_propmt_v1 = """
+BREAK_QUESTION_PROMPT_V1 = """
 break this question into multi-hop questions, first i give you an example then the question.
 Example Question: 
 "What is the predominant religion where the leader is Ovadia Yosef?" with initial node: "Ovadia Yosef".
@@ -21,8 +21,9 @@ Now the main question:
 "%s" with initial node: "%s"
 """
 
+
 # check model dont generate useless question (especially first question)
-break_question_propmt_v2='''
+BREAK_QUESTION_PROMPT_V2='''
 I have a knowledge graph and I have the current node "%s" and I already know the information about this node so don't ask about this node. Break down the question "%s" into multi-hop sub-questions, starting from the current node.
 
 Here’s an example of the expected output format:
@@ -41,21 +42,9 @@ Now, for the main question:
 "%s" with current node: "%s"
 '''
 
-score_te_r_ce_prompt = """
-I'm walking on a knowledge graph with the following entity-relation-entity triplets. Please score all of these triplets base on contributation to answering the question "%s", in the following format <entity> -- <relation> -- <entity>: <sentences> Score:<score>. The sum of the scores should be 1.
-Entity-Relation-Entity triplets:
-%s
-"""
-
-# current_node, retrival_number, question, realtion-entity pairs 
-extract_relation_entity_prompt = """
-I have a knowledge graph with node "%s" and the following relation-entity pairs. Please retrieve %s of the relations that contribute to answering the question "%s", and provide the answer in the format <relation> -- <entity>: <sentences> Score:<score>. The sum of the scores of the relevant relations should be 1.
-Relation-Entity Pairs:
-%s
-"""
 
 # give correct outpute format for evaluation (@Yes/No@ and @Answer@)
-reasoning_sys_prompt="""You are an assistant that evaluates if retrieved knowledge graph triplets are sufficient to answer a question. 
+REASONING_SYS_PROMPT="""You are an assistant that evaluates if retrieved knowledge graph triplets are sufficient to answer a question. 
 
 Rules:
 1. First decide if the triplets are sufficient.
@@ -83,14 +72,16 @@ Gymnopilus spectabilis, parent taxon, Gymnopilus
 A: @False@. @The triplets only describe chemical and biological relationships of psilocybin, and provide no information about Steve Bisciotti, his team, or its coach@. Therefore, the answer to the question is @No Answer@
 """
 
-reasoning_user_prompt = """
+
+REASONING_USER_PROMPT = """
 Q: %s
 Knowledge Triplets:
 %s
 A:
 """
 
-half_stop_prompt = """Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your own knowledge.
+
+HALF_STOP_PROMPT = """Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your own knowledge.
 @Explanation@. Therefore, the answer to the question is @Answer/need_information@
 for example:
 Q: Viscount Yamaji Motoharu was a general in the early Imperial Japanese Army which belonged to which Empire?
@@ -110,7 +101,8 @@ A: Based on the given knowledge triplets and my knowledge, the specific psychede
 
 Q: """
 
-cot_sys_prompt = """
+
+COT_SYS_PROMPT = """
 Q: What state is home to the university that is represented in sports by George Washington Colonials men's basketball?
 A: First, the education institution has a sports team named George Washington Colonials men's basketball in is George Washington University , Second, George Washington University is in Washington D.C. The answer is @Washington, D.C.@.
 
@@ -130,6 +122,48 @@ Q: What drug did the actor who portrayed the character Urethane Wheels Guy overd
 A: First, Mitchell Lee Hedberg portrayed character Urethane Wheels Guy. Second, Mitchell Lee Hedberg overdose Heroin. The answer is @Heroin@.
 """
 
-cot_user_prompt = """
+
+COT_USER_PROMPT = """
 Q: %s
+"""
+
+
+EXTRACT_RELATION_ENTITY_SYS_PROMPT = """
+You are an information extraction engine navigating a knowledge graph (KG).
+
+At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs.
+Your goal is to select the most relevant relations for answering a given question.
+
+You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
+
+Output format (strict):
+[
+  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
+  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
+  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0}
+]
+
+Rules:
+- Output exactly the requested number of items (no more, no less).
+- "relation" and "entity" MUST come verbatim from the provided list.
+- Each "sentences" field briefly explains why the pair helps answer the question (max 2 sentences).
+- "score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance).
+- No text, markdown, or commentary outside the JSON array.
+"""
+
+
+EXTRACT_RELATION_ENTITY_USER_PROMPT = """
+You are currently WALKING on a Knowledge Graph (KG).
+You are now **at node "%s"**.
+
+Your task is to look at all outgoing relation–entity pairs from this node
+and select exactly %s pairs that are most helpful for answering the question below.
+
+Question:
+"%s"
+
+Relation–Entity pairs from the current node:
+%s
+
+Select exactly %s items following the JSON schema given in the system message.
 """
