@@ -3,7 +3,7 @@ import logging
 import re
 from app.core.config import RunConfig
 from app.utils import run_llm, extract_answer
-from app.prompt_list import reasoning_user_prompt, reasoning_sys_prompt, cot_sys_prompt, cot_user_prompt
+from app.prompt_list import REASONING_USER_PROMPT, REASONING_SYS_PROMPT, COT_SYS_PROMPT, COT_USER_PROMPT
 from app.core.models import PathResult, Branch
 
 logger = logging.getLogger("app.adapters.llm")
@@ -27,8 +27,8 @@ class LLMReasoner(Reasoner):
 
     def cot(self, main_q: str, *, session_key: str) -> Dict:
         logger.info(f"COT start", extra={"session_key": session_key})
-        sys_prompt = cot_sys_prompt
-        user_prompt = cot_user_prompt % main_q
+        sys_prompt = COT_SYS_PROMPT
+        user_prompt = COT_USER_PROMPT % main_q
         logger.debug(f'COT user_prompt:\n{user_prompt}', extra={'session_key': session_key})
         response = run_llm(
             user_prompt=user_prompt,
@@ -63,8 +63,8 @@ class LLMReasoner(Reasoner):
         # 4) Call your existing reasoning(...)
         logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": session_key})
         
-        sys_prompt = reasoning_sys_prompt
-        user_prompt = reasoning_user_prompt % (main_q, walker_shim.format_for_llm())
+        sys_prompt = REASONING_SYS_PROMPT
+        user_prompt = REASONING_USER_PROMPT % (main_q, walker_shim.format_for_llm())
         
         logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
         response = run_llm(
