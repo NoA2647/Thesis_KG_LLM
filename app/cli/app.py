@@ -51,7 +51,6 @@ def main():
         data_id = row[id_key]
         # initial topic entities: dict of {qid: label}
         initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
-        initial_map = {}
         if not initial_map:
             logger.warning(f"no_initial_entities row={idx}; COT generating", extra={"session_key": session_key})
             result = reasoner.cot(main_q=main_q, session_key=session_key)
