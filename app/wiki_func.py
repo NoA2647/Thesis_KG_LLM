@@ -54,42 +54,13 @@ def clean_te_r_ce_triplets(result, te_r_ce_list):
                 break
     return bool(scored_triplets), scored_triplets
 
-def parse_items(result: str):
-    # 1) normalize markup / punctuation
-    text = (result
-            .replace("**", "")
-            .replace("—", "--")
-            .replace("–", "--"))
-
-    # 2) compile with DOTALL so sentence can contain anything (incl. newlines)
-    pattern = re.compile(
-        r'(?:^\s*\d+\.\s*)?'                                 # optional numbering at line start
-        r'(?P<relation_label>[\w_]+)\s*'                     # relation
-        r'(?:--|—|–|\s*--\s*)\s*'                            # tolerate dash variants / spacing
-        r'(?P<entity_candidate_label>[^:]+?)\s*'             # up to the colon, lazy
-        r':\s*'
-        r'(?P<sentence>.*?)\s*'                              # explanation text
-        r'Score:\s*(?P<score>\d+(?:\.\d+)?)',                # 0.4 or 1 (support ints too)
-        re.DOTALL | re.MULTILINE
-    )
-
-    matches = []
-    for m in pattern.finditer(text):
-        matches.append({
-            "relation_label": m.group("relation_label").strip(),
-            "entity_candidate_label": m.group("entity_candidate_label").strip(),
-            "sentence": m.group("sentence").strip(),
-            "score": float(m.group("score")) if m.group("score") else 0.0
-        })
-    return matches
-
 
 def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]]) -> List[Hop]:
-    matches = parse_items(result)
+    matches = json.loads(result)
     scored_hops: List[Hop] = []
     for match in matches:
         for pair in relation_entity_pairs:
-            if match['entity_candidate_label'] == pair[1].label.replace(" ","_") and match['relation_label'] == pair[0].label.replace(" ","_"):
+            if match['entity'] == pair[1].label.replace(" ","_") and match['relation'] == pair[0].label.replace(" ","_"):
                 scored_hops.append(
                     Hop(
                         source=te,
@@ -103,31 +74,19 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
     return scored_hops
 
 
-def construct_te_r_ce_prune_prompt(question, te_r_ce_list):
-    result = ""
-    idx = 1
-    for triplet in te_r_ce_list:
-        if triplet['entity_candidate_id'] != None:
-            result += f"{idx}. {triplet['topic_entity_label'].replace(' ', '_')} -- {triplet['relation_label'].replace(' ', '_')} -- {triplet['entity_candidate_label'].replace(' ', '_')}\n"            
-            idx += 1
-
-    prompt_str = score_te_r_ce_prompt %(question, result) 
-    
-    return prompt_str
-
 def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
     result = ""
     for idx, pair in enumerate(relation_entity_pairs, start=1):
         if pair[1].qid != None:
             result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n"
             
-    prompt_str = extract_relation_entity_prompt %(entity_name, configs.beam_width, question, result) 
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(entity_name, configs.beam_width, question, result, configs.beam_width) 
     
     return prompt_str
 
 
 def construct_break_question_prompt(question, entity_name):
-    return break_question_propmt_v2 % (entity_name, question, question, entity_name)
+    return BREAK_QUESTION_PROMPT_V2 % (entity_name, question, question, entity_name)
 
 
 def check_end_word(s):
@@ -172,13 +131,14 @@ def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity
                                  configs: RunConfig, llm_logger, session_key
                                  )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
-    prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, configs)
-    llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(user_prompt=prompt,
+    user_prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, configs)
+    llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{user_prompt}', extra={'session_key': session_key})
+    result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
                      openai_api_keys=configs.openai_api_key,
-                     engine=configs.llm_type)
+                     engine=configs.llm_type,
+                     sys_prompt=EXTRACT_RELATION_ENTITY_SYS_PROMPT)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
     return clean_relation_entity_pairs(result, te, relation_entity_pairs)
@@ -233,27 +193,6 @@ def entity_search(entity_qid, relation_label, wiki_client):
     
     return id_list, name_list
 
-# replace of entity_score
-# (current_TE_R_CE_list, sub_question, arges(width), llm_logger, session_key)
-def te_r_ce_score(te_r_ce_list, sub_question, configs: RunConfig, llm_logger, session_key):
-    if len(te_r_ce_list) == 1:
-        return te_r_ce_list
-
-    # prompt = construct_entity_score_prompt(question, relation_label, entity_candidates)
-    prompt = construct_te_r_ce_prune_prompt(sub_question, te_r_ce_list)
-    
-    llm_logger.debug(f'te_r_ce prune prompt:\n{prompt}', extra={'session_key': session_key})
-    result = run_llm(user_prompt=prompt,
-                     temperature=configs.temperature_exploration,
-                     max_tokens=configs.max_length,
-                     openai_api_keys=configs.openai_api_key,
-                     engine=configs.llm_type)
-    llm_logger.debug(f'raw result for te_r_ce_score:\n{result}', extra={'session_key': session_key})
-    flag, scored_pairs = clean_te_r_ce_triplets(result, te_r_ce_list)
-    llm_logger.debug(f'clean_te_r_ce scores:\n{scored_pairs}', extra={'session_key': session_key})
-    
-    return flag, scored_pairs
-
 
 def update_history(entity_candidates, entity, scores, entity_candidates_id, total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head, value_flag):
     if value_flag:
@@ -277,7 +216,7 @@ def half_stop(question, walker, depth, configs: RunConfig, llm_logger, session_k
 
 
 def generate_answer(question, walker, configs: RunConfig, llm_logger, session_key): 
-    prompt = half_stop_prompt + question + '\n'
+    prompt = HALF_STOP_PROMPT + question + '\n'
     prompt += "\nKnowledge Triplets: " + walker.format_for_llm() + 'A: '
     llm_logger.debug(f"generate haf stop answer prompt:\n{prompt}", extra={'session_key': session_key})
     result = run_llm(user_prompt=prompt,
@@ -305,8 +244,8 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
 
 
 def reasoning(question, walker, configs: RunConfig, llm_logger, session_key):
-    sys_prompt = reasoning_sys_prompt
-    user_prompt = reasoning_user_prompt % (question, walker.format_for_llm())
+    sys_prompt = REASONING_SYS_PROMPT
+    user_prompt = REASONING_USER_PROMPT % (question, walker.format_for_llm())
     
     llm_logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
     response = run_llm(
