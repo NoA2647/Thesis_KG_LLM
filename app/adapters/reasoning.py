@@ -1,8 +1,10 @@
-from typing import Dict, List, Optional
+from typing import Dict, List
 import logging
+import re
 from app.core.config import RunConfig
-from app.core.models import PathResult, Branch, Hop
-from app.wiki_func import reasoning as legacy_reasoning
+from app.utils import run_llm, extract_answer
+from app.prompt_list import reasoning_user_prompt, reasoning_sys_prompt, cot_sys_prompt, cot_user_prompt
+from app.core.models import PathResult, Branch
 
 logger = logging.getLogger("app.adapters.llm")
 
@@ -23,6 +25,29 @@ class LLMReasoner(Reasoner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
+    def cot(self, main_q: str, *, session_key: str) -> Dict:
+        logger.info(f"COT start", extra={"session_key": session_key})
+        sys_prompt = cot_sys_prompt
+        user_prompt = cot_user_prompt % main_q
+        logger.debug(f'COT user_prompt:\n{user_prompt}', extra={'session_key': session_key})
+        response = run_llm(
+            user_prompt=user_prompt,
+            temperature=self.cfg.temperature_reasoning,
+            max_tokens=self.cfg.max_length,
+            openai_api_keys=self.cfg.openai_api_key,
+            engine=self.cfg.llm_type,
+            sys_prompt=sys_prompt
+        )
+        
+        logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
+        answers = re.findall(r'The answer is\s*@(.+?)@', response, flags=re.IGNORECASE)
+        logger.debug(f'extract_answer:\n{answers}', extra={'session_key': session_key})
+        logger.info("COT done", extra={"session_key": session_key})
+        return {
+            "answer": {"ok": True, "answer": answers[0]},
+            "paths": []
+            }
+    
     def reason(self, main_q: str, results: List[PathResult], *, session_key: str) -> Dict:
         # 1) Gather all branches across paths
         branches: List[Branch] = []
@@ -37,13 +62,28 @@ class LLMReasoner(Reasoner):
 
         # 4) Call your existing reasoning(...)
         logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": session_key})
-        ok, answer = legacy_reasoning(
-            question=main_q,
-            walker=walker_shim,
-            configs=self.cfg,
-            llm_logger=logger,
-            session_key=session_key,
+        
+        sys_prompt = reasoning_sys_prompt
+        user_prompt = reasoning_user_prompt % (main_q, walker_shim.format_for_llm())
+        
+        logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
+        response = run_llm(
+            user_prompt=user_prompt,
+            temperature=self.cfg.temperature_reasoning,
+            max_tokens=self.cfg.max_length,
+            openai_api_keys=self.cfg.openai_api_key,
+            engine=self.cfg.llm_type,
+            sys_prompt=sys_prompt
         )
+        logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
+        result = extract_answer(response)
+        logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})
+        if result is not None:
+            ok = True
+            answer = result
+        else:
+            ok = False
+            answer = None
         
         logger.info("reasoning done", extra={"session_key": session_key})
         return {"ok": bool(ok), "answer": answer}
