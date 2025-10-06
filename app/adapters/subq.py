@@ -1,8 +1,10 @@
-from typing import List, Optional
+from typing import List
+import json 
 import logging
 from app.core.config import RunConfig
 from app.core.models import TopicEntity
-from app.core.errors import SubquestionError
+from app.prompt_list import BREAK_QUESTION_USER_PROMPT, BREAK_QUESTION_SYS_PROMPT
+from app.utils import run_llm
 from app.wiki_func import break_question
 
 
@@ -26,13 +28,18 @@ class LLMSubQGenerator(SubQGenerator):
 
     def generate(self, main_q: str, initial: TopicEntity, *, session_key: str) -> List[str]:
         try:
-            subs = break_question(
-                question=main_q,
-                entity_name=initial.label,
-                configs=self.cfg,
-                llm_logger=logger,
-                session_key=session_key,
-            )
+            user_prompt = BREAK_QUESTION_USER_PROMPT % (main_q, initial.label)
+            logger.debug(f'break_question prompt:\n{user_prompt}', extra={'session_key': session_key})
+            result = run_llm(user_prompt=user_prompt,
+                            temperature=self.cfg.temperature_exploration,
+                            max_tokens=self.cfg.max_length,
+                            openai_api_keys=self.cfg.openai_api_key,
+                            sys_prompt=BREAK_QUESTION_SYS_PROMPT,
+                            engine=self.cfg.llm_type)
+            logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
+            subs = json.loads(result)['steps']
+            logger.debug(f'All sub_questions:\n{subs}', extra={'session_key': session_key})
+            subs = [s['sub_question'] for s in subs]
             logger.info(f"subqs generated: {len(subs)} for {initial.label}", extra={"session_key": session_key})
             return subs or []
         except Exception as e:
