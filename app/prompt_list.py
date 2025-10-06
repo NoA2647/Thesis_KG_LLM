@@ -156,7 +156,8 @@ EXTRACT_RELATION_ENTITY_SYS_PROMPT = """
 You are an information extraction engine navigating a knowledge graph (KG).
 
 At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs.
-Your goal is to select the most relevant relations for answering a given question.
+You also know the list of nodes already visited along your traversal path.
+Your goal is to select the most relevant relations for answering a given question, while avoiding revisiting any already-visited entities.
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
@@ -170,6 +171,7 @@ Output format (strict):
 Rules:
 - Output exactly the requested number of items (no more, no less).
 - "relation" and "entity" MUST come verbatim from the provided list.
+- Do NOT select any entity that appears in the list of already visited nodes.
 - Each "sentences" field briefly explains why the pair helps answer the question (max 2 sentences).
 - "score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance).
 - No text, markdown, or commentary outside the JSON array.
@@ -179,6 +181,7 @@ Rules:
 EXTRACT_RELATION_ENTITY_USER_PROMPT = """
 You are currently WALKING on a Knowledge Graph (KG).
 You are now **at node "%s"**.
+You have already visited these nodes: %s.
 
 Your task is to look at all outgoing relation–entity pairs from this node
 and select exactly %s pairs that are most helpful for answering the question below.
