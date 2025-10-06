@@ -1,6 +1,7 @@
 from typing import Dict, List
 import logging
 import re
+import json
 from app.core.config import RunConfig
 from app.utils import run_llm, extract_answer
 from app.prompt_list import REASONING_USER_PROMPT, REASONING_SYS_PROMPT, COT_SYS_PROMPT, COT_USER_PROMPT
@@ -40,11 +41,11 @@ class LLMReasoner(Reasoner):
         )
         
         logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
-        answers = re.findall(r'The answer is\s*@(.+?)@', response, flags=re.IGNORECASE)
-        logger.debug(f'extract_answer:\n{answers}', extra={'session_key': session_key})
+        answer = json.loads(response)
+        logger.debug(f'extract_answer:\n{answer}', extra={'session_key': session_key})
         logger.info("COT done", extra={"session_key": session_key})
         return {
-            "answer": {"ok": True, "answer": answers[0]},
+            "answer": {"ok": True, "answer": answer['final_answer']},
             "paths": []
             }
     
@@ -76,7 +77,7 @@ class LLMReasoner(Reasoner):
             sys_prompt=sys_prompt
         )
         logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
-        result = extract_answer(response)
+        result = json.loads(response)
         logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})
         if result is not None:
             ok = True

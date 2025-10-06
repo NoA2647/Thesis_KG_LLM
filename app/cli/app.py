@@ -72,7 +72,7 @@ def main():
                 logger.exception(f"pipeline_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
                 continue
 
-        answer = result["answer"]               # return answer={ok:bool, answer:{"answered": answered,"explanation": explanation,"answer": answer}}
+        answer = result["answer"]               # return answer={ok:bool, answer:{"sufficient": answered, "explanation": explanation, "final_answer": answer}}
         path_results = result["paths"]          # list of PathResult
 
         try:
