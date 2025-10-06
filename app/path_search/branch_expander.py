@@ -28,13 +28,14 @@ class BranchExpander:
         May return [] if no candidates or on adapter failures (treated as no expansion).
         """
         frontier: TopicEntity = branch.frontier
+        previous_hops: List[Hop] = branch.history
         pairs: List[tuple[RelationEdge, TopicEntity]] = self.kg.relations(frontier)
         logger.debug(f"expand frontier={frontier.label} pairs={len(pairs)}", extra={"session_key": session_key})
 
         if not pairs:
             return []
 
-        hops: List[Hop] = self.pruner.prune(subq=subq, te=frontier, pairs=pairs, session_key=session_key)
+        hops: List[Hop] = self.pruner.prune(subq=subq, te=frontier, previous_hops=previous_hops,  pairs=pairs, session_key=session_key)
         if not hops:
             return []
 

@@ -74,13 +74,15 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
     return scored_hops
 
 
-def construct_relation_entity_prune_prompt(question, entity_name, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
+def construct_relation_entity_prune_prompt(question, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
     result = ""
     for idx, pair in enumerate(relation_entity_pairs, start=1):
         if pair[1].qid != None:
             result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n"
             
-    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(entity_name, configs.beam_width, question, result, configs.beam_width) 
+    previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
+            
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(entity_name, previous_nodes_label, configs.beam_width, question, result, configs.beam_width) 
     
     return prompt_str
 
@@ -123,11 +125,12 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig,
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}', extra={'session_key': session_key})
     return relation_entity_pairs
 
-def relation_entity_search_prune(te: TopicEntity, question: str, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+def relation_entity_search_prune(te: TopicEntity, question: str, previous_hops: List[Hop], relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
                                  configs: RunConfig, llm_logger, session_key
                                  )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
-    user_prompt = construct_relation_entity_prune_prompt(question, te.label, relation_entity_pairs, configs)
+    previous_nodes_label = [node.source.label for node in previous_hops]
+    user_prompt = construct_relation_entity_prune_prompt(question, te.label, previous_nodes_label, relation_entity_pairs, configs)
     llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{user_prompt}', extra={'session_key': session_key})
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,

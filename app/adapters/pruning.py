@@ -14,6 +14,7 @@ class Pruner:
         self,
         subq: str,
         te: TopicEntity,
+        previous_hops: List[Hop],
         pairs: List[Tuple[RelationEdge, TopicEntity]],
         session_key: str,
     ) -> List[Hop]:
@@ -31,6 +32,7 @@ class LLMPruning(Pruner):
         self,
         subq: str,
         te: TopicEntity,
+        previous_hops: List[Hop],
         pairs: List[Tuple[RelationEdge, TopicEntity]],
         session_key: str
     ) -> List[Hop]:
@@ -38,7 +40,7 @@ class LLMPruning(Pruner):
         if not te.qid or not pairs:
             return [Hop(te, rel, ce, 0.0) for rel, ce in pairs]
         
-        hops = relation_entity_search_prune(te, subq, pairs, self.cfg, logger, session_key)
+        hops = relation_entity_search_prune(te, subq, previous_hops, pairs, self.cfg, logger, session_key)
         logger.debug(f"LLM pruning applied; hops={len(hops)}", extra={"session_key": session_key})
 
         return hops
