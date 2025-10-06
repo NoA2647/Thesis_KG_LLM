@@ -156,12 +156,6 @@ def extract_answer(text: str) -> Optional[Dict[str, Any]]:
         "explanation": explanation,
         "answer": answer
     }
-    
-
-def generate_without_explored_paths(question, args):
-    prompt = cot_prompt + "\n\nQ: " + question + "\nA:"
-    response = run_llm(prompt, args['temperature_reasoning'], args['max_length'], args['opeani_api_keys'], args['LLM_type'])
-    return response
 
 
 def if_finish_list(lst):

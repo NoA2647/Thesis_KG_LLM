@@ -8,8 +8,7 @@ Output format (strict):
   "steps": [
     {"sub_question": "<actionable step starting from the current node>", "purpose": "<why this step is needed>"},
     {"sub_question": "<next step>", "purpose": "<why this step is needed>"}
-  ],
-  "final_goal": "<what must be known to directly answer the main question>"
+  ]
 }
 
 Rules:
