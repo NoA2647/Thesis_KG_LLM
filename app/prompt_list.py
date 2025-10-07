@@ -207,6 +207,9 @@ Your task is to look at all outgoing relation–entity pairs from this node
 and select exactly %s pairs that are most helpful for advancing toward the MAIN question
 and fulfilling the PURPOSE of the current sub-question.
 
+The current sub-question is:
+%s
+
 Relation–Entity pairs from the current node:
 %s
 
