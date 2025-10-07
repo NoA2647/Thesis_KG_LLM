@@ -74,7 +74,7 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
     return scored_hops
 
 
-def construct_relation_entity_prune_prompt(question, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
+def construct_relation_entity_prune_prompt(main_question, sub_question, previous_sub_question, purpose, initial_node, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
     result = ""
     for idx, pair in enumerate(relation_entity_pairs, start=1):
         if pair[1].qid != None:
@@ -82,7 +82,7 @@ def construct_relation_entity_prune_prompt(question, entity_name, previous_nodes
             
     previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
             
-    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(entity_name, previous_nodes_label, configs.beam_width, question, result, configs.beam_width) 
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_question, purpose, entity_name, previous_nodes_label, configs.beam_width, sub_question, result, configs.beam_width) 
     
     return prompt_str
 
