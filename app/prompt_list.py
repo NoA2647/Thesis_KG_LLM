@@ -156,8 +156,14 @@ EXTRACT_RELATION_ENTITY_SYS_PROMPT = """
 You are an information extraction engine navigating a knowledge graph (KG).
 
 At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs.
-You also know the list of nodes already visited along your traversal path.
-Your goal is to select the most relevant relations for answering a given question, while avoiding revisiting any already-visited entities.
+You also know:
+- The MAIN question being answered.
+- The INITIAL node where reasoning began.
+- The sub-questions already traversed in this reasoning path.
+- The PURPOSE of the current sub-question you are solving.
+
+Your goal is to select the most relevant relation–entity pairs for progressing toward the MAIN question,
+while avoiding revisiting any entities already explored in the traversal path.
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
@@ -172,7 +178,8 @@ Rules:
 - Output exactly the requested number of items (no more, no less).
 - "relation" and "entity" MUST come verbatim from the provided list.
 - Do NOT select any entity that appears in the list of already visited nodes.
-- Each "sentences" field briefly explains why the pair helps answer the question (max 2 sentences).
+- Each "sentences" field must clearly connect this hop to the PURPOSE of the current sub-question,
+  and explain how it helps progress toward answering the MAIN question about the INITIAL node (max 2 sentences).
 - "score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance).
 - No text, markdown, or commentary outside the JSON array.
 """
@@ -180,14 +187,25 @@ Rules:
 
 EXTRACT_RELATION_ENTITY_USER_PROMPT = """
 You are currently WALKING on a Knowledge Graph (KG).
-You are now **at node "%s"**.
-You have already visited these nodes: %s.
+
+MAIN question:
+"%s"
+
+INITIAL node (starting entity of reasoning):
+"%s"
+
+You have walked through these sub-questions so far:
+%s
+
+The purpose of the CURRENT sub-question is:
+"%s"
+
+You are now **at node "%s"**, and you have already visited these nodes:
+%s
 
 Your task is to look at all outgoing relation–entity pairs from this node
-and select exactly %s pairs that are most helpful for answering the question below.
-
-Question:
-"%s"
+and select exactly %s pairs that are most helpful for advancing toward the MAIN question
+and fulfilling the PURPOSE of the current sub-question.
 
 Relation–Entity pairs from the current node:
 %s
