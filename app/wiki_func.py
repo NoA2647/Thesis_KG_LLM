@@ -74,7 +74,7 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
     return scored_hops
 
 
-def construct_relation_entity_prune_prompt(main_question, sub_question, previous_sub_question, purpose, initial_node, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
+def construct_relation_entity_prune_prompt(main_question, sub_question, previous_sub_questions, purpose, initial_node, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
     result = ""
     for idx, pair in enumerate(relation_entity_pairs, start=1):
         if pair[1].qid != None:
@@ -82,7 +82,7 @@ def construct_relation_entity_prune_prompt(main_question, sub_question, previous
             
     previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
             
-    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_question, purpose, entity_name, previous_nodes_label, configs.beam_width, sub_question, result, configs.beam_width) 
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_questions, purpose, entity_name, previous_nodes_label, configs.beam_width, sub_question, result, configs.beam_width) 
     
     return prompt_str
 
@@ -125,12 +125,21 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig,
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}', extra={'session_key': session_key})
     return relation_entity_pairs
 
-def relation_entity_search_prune(te: TopicEntity, question: str, previous_hops: List[Hop], relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
-                                 configs: RunConfig, llm_logger, session_key
+def relation_entity_search_prune(main_q: str,
+                                 sub_question: str,
+                                 previous_sub_questions: List[str],
+                                 purpose: str,
+                                 initial_node: TopicEntity,
+                                 current_node: TopicEntity,
+                                 previous_hops: List[Hop],
+                                 relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+                                 configs: RunConfig,
+                                 llm_logger,
+                                 session_key
                                  )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
     previous_nodes_label = [node.source.label for node in previous_hops]
-    user_prompt = construct_relation_entity_prune_prompt(question, te.label, previous_nodes_label, relation_entity_pairs, configs)
+    user_prompt = construct_relation_entity_prune_prompt(main_q, sub_question, previous_sub_questions, purpose, initial_node.label, current_node.label, previous_nodes_label, relation_entity_pairs, configs)
     llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{user_prompt}', extra={'session_key': session_key})
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
@@ -140,7 +149,7 @@ def relation_entity_search_prune(te: TopicEntity, question: str, previous_hops: 
                      sys_prompt=EXTRACT_RELATION_ENTITY_SYS_PROMPT)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
     # Clean and extract relation-entity pairs with scores
-    return clean_relation_entity_pairs(result, te, relation_entity_pairs)
+    return clean_relation_entity_pairs(result, current_node, relation_entity_pairs)
 
 
 def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger, session_key):

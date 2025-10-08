@@ -22,7 +22,7 @@ class BranchExpander:
         self.scorer = scorer
         self.combine_rule = combine_rule
 
-    def expand(self, branch: Branch, subq: str, session_key: str) -> List[Branch]:
+    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str,  session_key: str) -> List[Branch]:
         """
         Returns a list of new branches produced by taking one hop from `branch.frontier`.
         May return [] if no candidates or on adapter failures (treated as no expansion).
@@ -35,7 +35,17 @@ class BranchExpander:
         if not pairs:
             return []
 
-        hops: List[Hop] = self.pruner.prune(subq=subq, te=frontier, previous_hops=previous_hops,  pairs=pairs, session_key=session_key)
+        hops: List[Hop] = self.pruner.prune(
+            main_q=main_q,
+            current_sq=subq,
+            previous_sqs=previous_sqs,
+            purpose=purpose,
+            initial_node=initial_node,
+            current_node=frontier,
+            previous_hops=previous_hops,
+            pairs=pairs,
+            session_key=session_key
+        )
         if not hops:
             return []
 

@@ -1,7 +1,7 @@
-from typing import Dict, List, Optional
+from typing import Dict, List
 import logging
 from app.core.config import RunConfig
-from app.core.models import TopicEntity, PathResult
+from app.core.models import TopicEntity, PathResult, SubQuestion
 from app.adapters.subq import SubQGenerator
 from app.adapters.reasoning import Reasoner
 from app.path_search.engine import PathSearchEngine
@@ -30,10 +30,10 @@ class PathPipeline:
         path_results: List[PathResult] = []
         for idx, initial in enumerate(initials):
             # 1) generate subquestions for this path
-            subqs = self.subq_gen.generate(main_q=main_question, initial=initial, session_key=session_key)
+            subqs:List[SubQuestion] = self.subq_gen.generate(main_q=main_question, initial=initial, session_key=session_key)
             if not subqs:
                 # No subquestions -> degenerate path result with empty final branches
-                logger.warning(f"no subqs for {initial.label}", extra={"session_key": session_key})
+                logger.warning(f"No subqs for {initial.label}", extra={"session_key": session_key})
                 path_results.append(
                     PathResult(
                         path_id=f"path_{idx}_{initial.qid or initial.label}",
@@ -45,7 +45,11 @@ class PathPipeline:
                 continue
 
             # 2) run per-path beam search
-            res = self.engine.run_path(subqs=subqs, initial=initial, path_id=f"path_{idx}_{initial.qid or initial.label}", session_key=session_key)
+            res = self.engine.run_path(main_q=main_question,
+                                       subqs=subqs,
+                                       initial=initial,
+                                       path_id=f"path_{idx}_{initial.qid or initial.label}",
+                                       session_key=session_key)
             path_results.append(res)
 
         # 3) run reasoning over all paths

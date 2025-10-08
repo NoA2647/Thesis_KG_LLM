@@ -1,7 +1,7 @@
 from typing import List
 import logging
 from app.core.errors import InvariantError
-from app.core.models import PathResult, TopicEntity, Branch
+from app.core.models import PathResult, TopicEntity, Branch, SubQuestion
 from app.path_search.branch_expander import BranchExpander
 from app.path_search.selectors import BranchSelector
 
@@ -21,7 +21,7 @@ class PathSearchEngine:
         self.selector = selector
         self.k = k
 
-    def run_path(self, subqs: List[str], initial: TopicEntity, path_id: str | None = None, session_key: str = "-") -> PathResult:
+    def run_path(self, main_q:str, subqs: List[SubQuestion], initial: TopicEntity, path_id: str | None = None, session_key: str = "-") -> PathResult:
         """
         Initialize beam with one branch at `initial`. For each subquestion:
           - expand all branches
@@ -34,13 +34,24 @@ class PathSearchEngine:
         # initial beam
         beam: List[Branch] = [Branch(history=[], frontier=initial, cum_score=0.0, alive=True)]
         prev_nonempty_beam: List[Branch] = beam
+        answered_subqs: List[str] = []
 
         for step_idx, subq in enumerate(subqs):
             # expand every branch in the current beam
             logger.info(f"step_start idx={step_idx} beam_in={len(beam)}", extra={"session_key": session_key})
             pool: List[Branch] = []
             for br in beam:
-                pool.extend(self.expander.expand(br, subq, session_key=session_key))
+                pool.extend(
+                    self.expander.expand(
+                        branch=br,
+                        initial_node=initial,
+                        main_q=main_q,
+                        previous_sqs=answered_subqs,
+                        subq=subq.question,
+                        purpose=subq.purpose,
+                        session_key=session_key
+                    )
+                )
 
             if not pool:
                 # early stop for this path: keep last non-empty beam
@@ -58,7 +69,7 @@ class PathSearchEngine:
             if len(next_beam) > self.k:
                 logger.error("selector returned > K branches", extra={"session_key": session_key})
                 raise InvariantError("selector returned more than K branches")
-
+            answered_subqs.append(subq.question)
             prev_nonempty_beam = next_beam
             beam = next_beam
 
