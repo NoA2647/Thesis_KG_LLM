@@ -113,13 +113,13 @@ class PathResult:
     
     path_id: str
     initial: TopicEntity
-    subqs: List[str]
+    subqs: List[SubQuestion]
     final_branches: List[Branch] = field(default_factory=list)
     
     def to_dict(self):
         return {
             "path_id": self.path_id,
             "initial": self.initial.to_dict(),
-            "subqs": self.subqs,
+            "subqs": [sq.to_dict() for sq in self.subqs],
             "final_branches": [b.to_dict() for b in self.final_branches],
         }
