@@ -94,26 +94,15 @@ class Branch:
         return [(h.source.label, h.relation.label, h.target.label) for h in self.history]
     
 @dataclass(slots=True)
-class PathState:
-    """
-    Mutable state while searching a single path (for one initial entity).
-    """
+class SubQuestion:
     
-    path_id: str
-    initial: TopicEntity
-    subqs: List[str]
-    step_index: int = 0
-    beam: List[Branch] = field(default_factory=list)
-    finished: bool = False
+    question: str
+    purpose: str
     
     def to_dict(self):
         return {
-            "path_id": self.path_id,
-            "initial": self.initial.to_dict(),
-            "subqs": self.subqs,
-            "step_index": self.step_index,
-            "beam": [b.to_dict() for b in self.beam],
-            "finished": self.finished
+            "question": self.question,
+            "purpose": self.purpose,
         }
     
 @dataclass(slots=True)
