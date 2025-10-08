@@ -15,7 +15,7 @@ Rules:
 - Start reasoning from the provided current node, but DO NOT ask for facts the system already knows about that node (avoid redundant queries about its basic attributes).
 - Each "sub_question" should be specific and help traverse the KG toward the answer.
 - Keep "purpose" to one short sentence.
-- Prefer 2–4 steps.
+- Prefer 1–4 steps.
 - Do NOT include any text, explanations, or formatting outside the JSON object.
 - Ensure valid JSON (no trailing commas).
 
