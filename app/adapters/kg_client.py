@@ -57,7 +57,7 @@ class WikidataKG(KGClient):
 
             try:
                 tails = self.wiki.get_tail_entities_given_head_and_relation(te.qid, pid)
-                # tails: [{"label": ..., "qid": ...}] (qid may be None for literals)
+                # tails: [{"label": ..., "qid": ..., "meta_data": ...}] (qid may be None for literals)
             except Exception as e:
                 # If a single property fails, skip it but continue
                 logger.warning(f"tails fetch failed for {te.qid} {pid}: {e}", extra={"session_key": "-"})
