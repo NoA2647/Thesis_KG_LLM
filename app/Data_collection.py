@@ -415,7 +415,48 @@ class WikiDataC_v2():
             json.dump(out, f, ensure_ascii=False, indent=2)
         return out
 
+    def get_all_relations_of_an_entity(self, entity_qid: str) -> List[Dict[str, str]]:
+        entity_info = self.get_entity_info(entity_qid)
+        all_relations = []
+        for pid, payload in entity_info["claims"].items():
+            all_relations.append({"pid": pid, "label": payload["label"]})
+        return all_relations
 
+    def label2pid(self, entity_qid: str, label: str):
+        entity_info = self.get_entity_info(entity_qid)
+        for pid, payload in entity_info["claims"].items():
+            if payload["label"] == label:
+                return pid
+        return False
+
+    def qid2label(self, entity_qid: str) -> str:
+        info = self._wbgetentities([entity_qid], props="labels").get(entity_qid, {})
+        return info.get("labels", {}).get(self.lang, {}).get("value", "")
+
+    def get_tail_entities_given_head_and_relation(self, entity_qid: str, relation_pid: str):
+        entity_info = self.get_entity_info(entity_qid)
+        payload = entity_info["claims"].get(relation_pid, {})
+        tail_entities = []
+        for st in payload["statements"]:
+            tail_entity = {}
+            heading = st["value"].get("label", "")
+            qid = st["value"].get("qid", "")
+            tail_entity['label'] = heading
+            tail_entity['qid'] = qid
+            meta_data = []
+            for q in st["qualifiers"]:
+                meta_data.append(
+                    {
+                        'property_label': q['property_label'],
+                        'value': q['value']['label']
+                    }
+                )
+            tail_entity['meta_data'] = meta_data
+            tail_entities.append(tail_entity)
+            
+        return tail_entities
+    
+    
 # collector = WikiDataC()
 # q = 'Q9696'
 # s = time.time()
