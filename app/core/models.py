@@ -14,12 +14,14 @@ class TopicEntity:
     qid: Optional[str]
     label: str
     is_value: bool = False
+    meta_data: Optional[List[dict]]
     
     def to_dict(self):
         return {
             "qid": self.qid,
             "label": self.label,
-            "is_value": self.is_value
+            "is_value": self.is_value,
+            "meta_data": self.meta_data
         }
 
 @dataclass(slots=True)
