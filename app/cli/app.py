@@ -12,8 +12,7 @@ from app.path_search.selectors import BranchSelector
 from app.path_search.engine import PathSearchEngine
 from app.path_search.pipeline import PathPipeline
 
-# your existing helpers (unchanged)
-from app.Data_collection import WikiDataC
+from app.adapters.Data_collection import WikiDataC_v2
 from app.utils import prepare_dataset, save_2_json
 
 def main():
@@ -31,7 +30,7 @@ def main():
     logger.info(f"\'{cfg.dataset}\' dataset loaded rows={len(data_rows)}", extra={"session_key": session_key})
 
     # 2) construct adapters (thin wrappers around your existing code)
-    low_level_wiki = WikiDataC()                       # your existing class
+    low_level_wiki = WikiDataC_v2()                       # your existing class
     kg = WikidataKG(low_level_wiki, cfg)               # returns (RelationEdge, TopicEntity) pairs
     subq_gen = LLMSubQGenerator(cfg)                   # calls break_question(...)
     scorer = DefaultScorer(cfg)                        # hop_score / combine
@@ -51,6 +50,7 @@ def main():
         data_id = row[id_key]
         # initial topic entities: dict of {qid: label}
         initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
+        initial_map = {"Q9696": "John F. Kennedy"}
         if not initial_map:
             logger.warning(f"no_initial_entities row={idx}; COT generating", extra={"session_key": session_key})
             result = reasoner.cot(main_q=main_q, session_key=session_key)

@@ -3,7 +3,7 @@ import logging
 from app.core.config import RunConfig
 from app.core.models import RelationEdge, TopicEntity
 from app.core.errors import KGError
-from app.Data_collection import WikiDataC
+from app.adapters.Data_collection import WikiDataC_v2
 from app.wiki_func import abandon_rels
 
 logger = logging.getLogger("app.adapters.kg")
@@ -18,7 +18,7 @@ class KGClient:
 
 class WikidataKG(KGClient):
     """
-    Concrete KG adapter wrapping your WikiDataC & helpers.
+    Concrete KG adapter wrapping your WikiDataC_v2 & helpers.
 
     - Uses get_all_relations_of_an_entity(qid) to list PIDs & labels
     - Uses get_tail_entities_given_head_and_relation(qid, pid) to fetch candidates
@@ -26,7 +26,7 @@ class WikidataKG(KGClient):
     - Returns a *flattened* list of (RelationEdge, TopicEntity) pairs ready for scoring
     """
 
-    def __init__(self, wiki: WikiDataC, cfg: RunConfig):
+    def __init__(self, wiki: WikiDataC_v2, cfg: RunConfig):
         self.wiki = wiki
         self.cfg = cfg
 
