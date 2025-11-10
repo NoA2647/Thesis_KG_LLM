@@ -76,13 +76,16 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
 
 def construct_relation_entity_prune_prompt(main_question, sub_question, previous_sub_questions, purpose, initial_node, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
     result = ""
-    for idx, pair in enumerate(relation_entity_pairs, start=1):
+    idx = 1
+    for pair in relation_entity_pairs:
         if pair[1].qid != None:
-            result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n"
+            meta_text = f"meta data of {pair[1].label.replace(' ', '_')}: {pair[1].meta_data}\n" if len(pair[1].meta_data) != 0 else ""
+            result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n" + meta_text
+            idx += 1
             
     previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
             
-    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_questions, purpose, entity_name, previous_nodes_label, configs.beam_width, sub_question, result, configs.beam_width) 
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_questions, previous_nodes_label, entity_name, configs.beam_width, sub_question, purpose, result, configs.beam_width) 
     
     return prompt_str
 
@@ -140,7 +143,7 @@ def relation_entity_search_prune(main_q: str,
     # Now we prompt the LLM to prune and score these relation-entity pairs
     previous_nodes_label = [node.source.label for node in previous_hops]
     user_prompt = construct_relation_entity_prune_prompt(main_q, sub_question, previous_sub_questions, purpose, initial_node.label, current_node.label, previous_nodes_label, relation_entity_pairs, configs)
-    llm_logger.debug(f'Relation-Entity Search Prune Prompt:\n{user_prompt}', extra={'session_key': session_key})
+    llm_logger.debug(f'Relation-Entity Search Prune User Prompt:\n{user_prompt}', extra={'session_key': session_key})
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
