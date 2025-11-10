@@ -1,5 +1,5 @@
 import uuid, logging
-from app.logging_config import setup_logging
+from app.logging_config import setup_logging, set_session_key
 from app.core.config import RunConfig
 from app.core.models import TopicEntity
 from app.adapters.kg_client import WikidataKG         # wraps your WikiDataC
@@ -16,18 +16,20 @@ from app.adapters.Data_collection import WikiDataC_v2
 from app.utils import prepare_dataset, save_2_json
 
 def main():
-    
     setup_logging(log_file="app/run.log", level=logging.DEBUG)
     logger = logging.getLogger("app.main")
 
     session_key = str(uuid.uuid4())
-    logger.info("run_start", extra={"session_key": session_key})
+    set_session_key(session_key)  
+    
+    
+    logger.info("run_start")
     
     cfg = RunConfig()
     cfg.validate()
 
     data_rows, question_key, id_key = prepare_dataset(cfg.dataset)
-    logger.info(f"\'{cfg.dataset}\' dataset loaded rows={len(data_rows)}", extra={"session_key": session_key})
+    logger.info(f"\'{cfg.dataset}\' dataset loaded rows={len(data_rows)}")
 
     # 2) construct adapters (thin wrappers around your existing code)
     low_level_wiki = WikiDataC_v2()                       # your existing class
@@ -50,10 +52,9 @@ def main():
         data_id = row[id_key]
         # initial topic entities: dict of {qid: label}
         initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
-        initial_map = {"Q9696": "John F. Kennedy"}
         if not initial_map:
-            logger.warning(f"no_initial_entities row={idx}; COT generating", extra={"session_key": session_key})
-            result = reasoner.cot(main_q=main_q, session_key=session_key)
+            logger.warning(f"no_initial_entities row={idx}; COT generating")
+            result = reasoner.cot(main_q=main_q)
         
         else:
             initial_entities = [
@@ -61,15 +62,14 @@ def main():
                 for qid, label in initial_map.items()
             ]
             
-            logger.info(f"row_start idx={idx} initials={len(initial_entities)} qlen={len(main_q)}",
-                        extra={"session_key": session_key})
+            logger.info(f"row_start idx={idx} initials={len(initial_entities)} qlen={len(main_q)}")
 
             # 5) run the pipeline (per-path independent beams → reasoning)
             try:
-                result = pipeline.run(main_question=main_q, initial_entities=initial_entities, session_key=session_key)
+                result = pipeline.run(main_question=main_q, initial_entities=initial_entities)
                 # result = {"answer": {...}, "paths": [PathResult, ...]}
             except Exception as e:
-                logger.exception(f"pipeline_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
+                logger.exception(f"pipeline_failed row={idx}, data_id={data_id}")
                 continue
 
         answer = result["answer"]               # return answer={ok:bool, answer:{"sufficient": answered, "explanation": explanation, "final_answer": answer}}
@@ -77,11 +77,11 @@ def main():
 
         try:
             save_2_json(data_id, question=main_q, results=answer, paths=path_results, file_name=cfg.dataset)
-            logger.info(f"row_saved idx={idx}, data_id={data_id}", extra={"session_key": session_key})
+            logger.info(f"row_saved idx={idx}, data_id={data_id}")
         except Exception:
-            logger.exception(f"save_failed row={idx}, data_id={data_id}", extra={"session_key": session_key})
+            logger.exception(f"save_failed row={idx}, data_id={data_id}")
 
-    logger.info("run_done", extra={"session_key": session_key})
+    logger.info("run_done")
 
     print("Done.")
 

@@ -13,7 +13,7 @@ class Reasoner:
     """
     Interface for final reasoning over all path results.
     """
-    def reason(self, main_q: str, results: List[PathResult], *, session_key: str) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult]) -> Dict:
         raise NotImplementedError
 
 
@@ -26,11 +26,11 @@ class LLMReasoner(Reasoner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def cot(self, main_q: str, *, session_key: str) -> Dict:
-        logger.info(f"COT start", extra={"session_key": session_key})
+    def cot(self, main_q: str) -> Dict:
+        logger.info(f"COT start")
         sys_prompt = COT_SYS_PROMPT
         user_prompt = COT_USER_PROMPT % main_q
-        logger.debug(f'COT user_prompt:\n{user_prompt}', extra={'session_key': session_key})
+        logger.debug(f'COT user_prompt:\n{user_prompt}')
         response = run_llm(
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
@@ -40,16 +40,16 @@ class LLMReasoner(Reasoner):
             sys_prompt=sys_prompt
         )
         
-        logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
+        logger.debug(f'raw result:\n{response}')
         answer = json.loads(response)
-        logger.debug(f'extract_answer:\n{answer}', extra={'session_key': session_key})
-        logger.info("COT done", extra={"session_key": session_key})
+        logger.debug(f'extract_answer:\n{answer}')
+        logger.info("COT done")
         return {
             "answer": {"ok": True, "answer": answer['final_answer']},
             "paths": []
             }
     
-    def reason(self, main_q: str, results: List[PathResult], *, session_key: str) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult]) -> Dict:
         # 1) Gather all branches across paths
         branches: List[Branch] = []
         for pr in results:
@@ -59,12 +59,12 @@ class LLMReasoner(Reasoner):
         triplets_text = _format_branches_for_llm(branches)
 
         # 3) Call your existing reasoning(...)
-        logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": session_key})
+        logger.info(f"reasoning start: branches={len(branches)}")
         
         sys_prompt = REASONING_SYS_PROMPT_V2
         user_prompt = REASONING_USER_PROMPT_V2 % (main_q, triplets_text)
         
-        logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
+        logger.debug(f'reasoning user_prompt:\n{user_prompt}')
         response = run_llm(
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
@@ -73,9 +73,9 @@ class LLMReasoner(Reasoner):
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
-        logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
+        logger.debug(f'raw result:\n{response}')
         result = json.loads(response)
-        logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})
+        logger.debug(f'extract_answer:\n{result}')
         if result is not None:
             ok = True
             answer = result
@@ -83,7 +83,7 @@ class LLMReasoner(Reasoner):
             ok = False
             answer = None
         
-        logger.info("reasoning done", extra={"session_key": session_key})
+        logger.info("reasoning done")
         return {"ok": bool(ok), "answer": answer}
 
 # --- helpers --- #

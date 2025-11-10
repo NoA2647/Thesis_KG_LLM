@@ -14,7 +14,7 @@ class SubQGenerator:
     """
     Interface for generating subquestions given main question and initial entity.
     """
-    def generate(self, main_q: str, initial: TopicEntity, *, session_key: str) -> List[SubQuestion]:
+    def generate(self, main_q: str, initial: TopicEntity) -> List[SubQuestion]:
         raise NotImplementedError
 
 
@@ -26,23 +26,23 @@ class LLMSubQGenerator(SubQGenerator):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def generate(self, main_q: str, initial: TopicEntity, *, session_key: str) -> List[SubQuestion]:
+    def generate(self, main_q: str, initial: TopicEntity) -> List[SubQuestion]:
         subqs:List[SubQuestion] = []
         try:
             user_prompt = BREAK_QUESTION_USER_PROMPT % (main_q, initial.label)
-            logger.debug(f'break_question prompt:\n{user_prompt}', extra={'session_key': session_key})
+            logger.debug(f'break_question prompt:\n{user_prompt}')
             result = run_llm(user_prompt=user_prompt,
                             temperature=self.cfg.temperature_exploration,
                             max_tokens=self.cfg.max_length,
                             openai_api_keys=self.cfg.openai_api_key,
                             sys_prompt=BREAK_QUESTION_SYS_PROMPT,
                             engine=self.cfg.llm_type)
-            logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
+            logger.debug(f'Raw results:\n{result}')
             subs = json.loads(result)['steps']
-            logger.debug(f'All sub_questions:\n{subs}', extra={'session_key': session_key})
+            logger.debug(f'All sub_questions:\n{subs}')
             subqs = [SubQuestion(s['sub_question'], s['purpose']) for s in subs]
-            logger.info(f"subqs generated: {len(subs)} for {initial.label}", extra={"session_key": session_key})
+            logger.info(f"subqs generated: {len(subs)} for {initial.label}")
             return subqs
         except Exception as e:
-            logger.error(f"subq generation failed for {initial.label}: {e}", extra={"session_key": session_key})
+            logger.error(f"subq generation failed for {initial.label}: {e}")
             return subqs

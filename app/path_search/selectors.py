@@ -13,7 +13,7 @@ class BranchSelector:
       - last_hop.relation.pid ASC
     """
 
-    def select_top_k(self, candidates: List[Branch], k: int, session_key: str) -> List[Branch]:
+    def select_top_k(self, candidates: List[Branch], k: int) -> List[Branch]:
         if not candidates:
             return []
 
@@ -26,5 +26,5 @@ class BranchSelector:
         # Sort by primary desc, tie-breakers asc
         sorted_cands = sorted(candidates, key=_key, reverse=True)
         out = sorted_cands[:k]
-        logger.info(f"select_top_k candidates={len(candidates)} -> kept={len(out)}", extra={"session_key": session_key})
+        logger.info(f"select_top_k candidates={len(candidates)} -> kept={len(out)}")
         return out

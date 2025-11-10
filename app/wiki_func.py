@@ -102,7 +102,7 @@ def abandon_rels(relation):
     return False
 
 
-def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig, wiki_client, llm_logger, session_key):
+def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig, wiki_client, llm_logger):
     # Retrieve all relations for the current entity
     relations = wiki_client.get_all_relations_of_an_entity(entity_id)
     head_relations = [rel['label'] for rel in relations]
@@ -125,7 +125,7 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig,
                 'entity_candidates_id': entity_candidates_id,
                 'entity_candidates_label': entity_candidates_name
             })
-    llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}', extra={'session_key': session_key})
+    llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}')
     return relation_entity_pairs
 
 def relation_entity_search_prune(main_q: str,
@@ -137,36 +137,35 @@ def relation_entity_search_prune(main_q: str,
                                  previous_hops: List[Hop],
                                  relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
                                  configs: RunConfig,
-                                 llm_logger,
-                                 session_key
+                                 llm_logger
                                  )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
     previous_nodes_label = [node.source.label for node in previous_hops]
     user_prompt = construct_relation_entity_prune_prompt(main_q, sub_question, previous_sub_questions, purpose, initial_node.label, current_node.label, previous_nodes_label, relation_entity_pairs, configs)
-    llm_logger.debug(f'Relation-Entity Search Prune User Prompt:\n{user_prompt}', extra={'session_key': session_key})
+    llm_logger.debug(f'Relation-Entity Search Prune User Prompt:\n{user_prompt}')
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
                      openai_api_keys=configs.openai_api_key,
                      engine=configs.llm_type,
                      sys_prompt=EXTRACT_RELATION_ENTITY_SYS_PROMPT)
-    llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}', extra={'session_key': session_key})
+    llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}')
     # Clean and extract relation-entity pairs with scores
     return clean_relation_entity_pairs(result, current_node, relation_entity_pairs)
 
 
-def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger, session_key):
+def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger):
     user_prompt = BREAK_QUESTION_USER_PROMPT % (question, entity_name)
-    llm_logger.debug(f'break_question prompt:\n{user_prompt}', extra={'session_key': session_key})
+    llm_logger.debug(f'break_question prompt:\n{user_prompt}')
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
                      openai_api_keys=configs.openai_api_key,
                      sys_prompt=BREAK_QUESTION_SYS_PROMPT,
                      engine=configs.llm_type)
-    llm_logger.debug(f'Raw results:\n{result}', extra={'session_key': session_key})
+    llm_logger.debug(f'Raw results:\n{result}')
     flag, sub_questions = clean_sub_questions(result)
-    llm_logger.debug(f'clean_sub_questions:\n{sub_questions}', extra={'session_key': session_key})
+    llm_logger.debug(f'clean_sub_questions:\n{sub_questions}')
     if flag:
         return sub_questions
     else:
@@ -233,29 +232,4 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
         return False, [], [], []
     entities_id, relations, candidates, tops, topls, scores = map(list, zip(*filtered_list))
     cluster_chain_of_entities = [(topls[i], relations[i], candidates[i], scores[i]) for i in range(len(candidates))]
-    return True, cluster_chain_of_entities, entities_id, relations
-
-
-def reasoning(question, walker, configs: RunConfig, llm_logger, session_key):
-    sys_prompt = REASONING_SYS_PROMPT
-    user_prompt = REASONING_USER_PROMPT % (question, walker.format_for_llm())
-    
-    llm_logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
-    response = run_llm(
-        user_prompt=user_prompt,
-        temperature=configs.temperature_reasoning,
-        max_tokens=configs.max_length,
-        openai_api_keys=configs.openai_api_key,
-        engine=configs.llm_type,
-        sys_prompt=sys_prompt
-    )
-    llm_logger.debug(f'raw result:\n{response}', extra={'session_key': session_key})
-    result = extract_answer(response)
-    llm_logger.debug(f'extract_answer:\n{result}', extra={'session_key': session_key})
-    if result is not None:
-        return True, result
-    else:
-        return False, None
-    
-
-    
+    return True, cluster_chain_of_entities, entities_id, relations   

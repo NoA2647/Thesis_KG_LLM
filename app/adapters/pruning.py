@@ -19,8 +19,7 @@ class Pruner:
         initial_node: TopicEntity,
         current_node: TopicEntity,
         previous_hops: List[Hop],
-        pairs: List[Tuple[RelationEdge, TopicEntity]],
-        session_key: str
+        pairs: List[Tuple[RelationEdge, TopicEntity]]
     ) -> List[Hop]:
         raise NotImplementedError
 
@@ -41,8 +40,7 @@ class LLMPruning(Pruner):
         initial_node: TopicEntity,
         current_node: TopicEntity,
         previous_hops: List[Hop],
-        pairs: List[Tuple[RelationEdge, TopicEntity]],
-        session_key: str
+        pairs: List[Tuple[RelationEdge, TopicEntity]]
     ) -> List[Hop]:
 
         if not current_node.qid or not pairs:
@@ -58,9 +56,8 @@ class LLMPruning(Pruner):
             previous_hops=previous_hops,
             relation_entity_pairs=pairs,
             configs=self.cfg,
-            llm_logger=logger,
-            session_key=session_key
+            llm_logger=logger
         )
-        logger.debug(f"LLM pruning applied; hops={len(hops)}", extra={"session_key": session_key})
+        logger.debug(f"LLM pruning applied; hops={len(hops)}")
 
         return hops

@@ -22,7 +22,7 @@ class BranchExpander:
         self.scorer = scorer
         self.combine_rule = combine_rule
 
-    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str,  session_key: str) -> List[Branch]:
+    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str) -> List[Branch]:
         """
         Returns a list of new branches produced by taking one hop from `branch.frontier`.
         May return [] if no candidates or on adapter failures (treated as no expansion).
@@ -30,7 +30,7 @@ class BranchExpander:
         frontier: TopicEntity = branch.frontier
         previous_hops: List[Hop] = branch.history
         pairs: List[tuple[RelationEdge, TopicEntity]] = self.kg.relations(frontier)
-        logger.debug(f"expand frontier={frontier.label} pairs={len(pairs)}", extra={"session_key": session_key})
+        logger.debug(f"expand frontier={frontier.label} pairs={len(pairs)}")
 
         if not pairs:
             return []
@@ -43,8 +43,7 @@ class BranchExpander:
             initial_node=initial_node,
             current_node=frontier,
             previous_hops=previous_hops,
-            pairs=pairs,
-            session_key=session_key
+            pairs=pairs
         )
         if not hops:
             return []
@@ -55,5 +54,5 @@ class BranchExpander:
             new_history = list(branch.history)
             new_history.append(hop)
             out.append(Branch(history=new_history, frontier=hop.target, cum_score=new_cum, alive=True))
-        logger.debug(f"expanded branches: {len(out)}", extra={"session_key": session_key})
+        logger.debug(f"expanded branches: {len(out)}")
         return out

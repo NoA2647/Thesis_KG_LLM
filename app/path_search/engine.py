@@ -21,7 +21,7 @@ class PathSearchEngine:
         self.selector = selector
         self.k = k
 
-    def run_path(self, main_q:str, subqs: List[SubQuestion], initial: TopicEntity, path_id: str | None = None, session_key: str = "-") -> PathResult:
+    def run_path(self, main_q:str, subqs: List[SubQuestion], initial: TopicEntity, path_id: str | None = None) -> PathResult:
         """
         Initialize beam with one branch at `initial`. For each subquestion:
           - expand all branches
@@ -29,7 +29,7 @@ class PathSearchEngine:
           - else select top-K -> new beam
         Returns PathResult with final branches.
         """
-        logger.info(f"path_start id={path_id} initial={initial.label} subqs={len(subqs)}", extra={"session_key": session_key})
+        logger.info(f"path_start id={path_id} initial={initial.label} subqs={len(subqs)}")
 
         # initial beam
         beam: List[Branch] = [Branch(history=[], frontier=initial, cum_score=0.0, alive=True)]
@@ -38,7 +38,7 @@ class PathSearchEngine:
 
         for step_idx, subq in enumerate(subqs):
             # expand every branch in the current beam
-            logger.info(f"step_start idx={step_idx} beam_in={len(beam)}", extra={"session_key": session_key})
+            logger.info(f"step_start idx={step_idx} beam_in={len(beam)}")
             pool: List[Branch] = []
             for br in beam:
                 pool.extend(
@@ -48,14 +48,13 @@ class PathSearchEngine:
                         main_q=main_q,
                         previous_sqs=answered_subqs,
                         subq=subq.question,
-                        purpose=subq.purpose,
-                        session_key=session_key
+                        purpose=subq.purpose
                     )
                 )
 
             if not pool:
                 # early stop for this path: keep last non-empty beam
-                logger.warning(f"early_finish at step {step_idx} (no candidates)", extra={"session_key": session_key})
+                logger.warning(f"early_finish at step {step_idx} (no candidates)")
                 
                 return PathResult(
                     path_id=path_id or f"path_{initial.qid or initial.label}",
@@ -65,16 +64,16 @@ class PathSearchEngine:
                 )
 
             # select top-K branches for next step
-            next_beam = self.selector.select_top_k(pool, self.k, session_key)
+            next_beam = self.selector.select_top_k(pool, self.k)
             if len(next_beam) > self.k:
-                logger.error("selector returned > K branches", extra={"session_key": session_key})
+                logger.error("selector returned > K branches")
                 raise InvariantError("selector returned more than K branches")
             answered_subqs.append(subq.question)
             prev_nonempty_beam = next_beam
             beam = next_beam
 
         # normal finish: consumed all subquestions
-        logger.info(f"path_finish id={path_id} final_beam={len(beam)}", extra={"session_key": session_key})
+        logger.info(f"path_finish id={path_id} final_beam={len(beam)}")
         return PathResult(
             path_id=path_id or f"path_{initial.qid or initial.label}",
             initial=initial,

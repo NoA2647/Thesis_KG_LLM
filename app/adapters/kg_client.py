@@ -32,21 +32,21 @@ class WikidataKG(KGClient):
 
     def relations(self, te: TopicEntity) -> List[Tuple[RelationEdge, TopicEntity]]:
         if not te.qid:
-            logger.debug("frontier is a literal; no outgoing relations", extra={"session_key": "-"})
+            logger.debug("frontier is a literal; no outgoing relations")
             return []
 
         try:
             rels = self.wiki.get_all_relations_of_an_entity(te.qid)  # [{pid,label}]
-            logger.debug(f"relations fetched: {len(rels)} for {te.label}({te.qid})", extra={"session_key": "-"})
+            logger.debug(f"relations fetched: {len(rels)} for {te.label}({te.qid})")
         except Exception as e:
-            logger.error(f"get_all_relations failed for {te.label}({te.qid}): {e}", extra={"session_key": "-"})
+            logger.error(f"get_all_relations failed for {te.label}({te.qid}): {e}")
             raise KGError(str(e)) from e
 
         # optional removal of noisy/unhelpful relations
         if self.cfg.remove_unnecessary_rel:
             before = len(rels)
             rels = [r for r in rels if not abandon_rels(r["label"])]
-            logger.debug(f"filtered relations: {before}->{len(rels)}", extra={"session_key": "-"})
+            logger.debug(f"filtered relations: {before}->{len(rels)}")
 
         out: List[Tuple[RelationEdge, TopicEntity]] = []
 
@@ -60,7 +60,7 @@ class WikidataKG(KGClient):
                 # tails: [{"label": ..., "qid": ..., "meta_data": ...}] (qid may be None for literals)
             except Exception as e:
                 # If a single property fails, skip it but continue
-                logger.warning(f"tails fetch failed for {te.qid} {pid}: {e}", extra={"session_key": "-"})
+                logger.warning(f"tails fetch failed for {te.qid} {pid}: {e}")
                 continue
 
             edge = RelationEdge(pid=str(pid), label=str(label))
@@ -77,5 +77,5 @@ class WikidataKG(KGClient):
                 )
                 out.append((edge, ce))
 
-        logger.debug(f"pairs produced: {len(out)} for {te.qid}", extra={"session_key": "-"})
+        logger.debug(f"pairs produced: {len(out)} for {te.qid}")
         return out
