@@ -447,8 +447,7 @@ class WikiDataC_v2():
             for q in st["qualifiers"]:
                 meta_data.append(
                     {
-                        'property_label': q['property_label'],
-                        'value': q['value']['label']
+                        q['property_label']: q['value']['label']
                     }
                 )
             tail_entity['meta_data'] = meta_data

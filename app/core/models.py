@@ -14,7 +14,7 @@ class TopicEntity:
     qid: Optional[str]
     label: str
     is_value: bool = False
-    meta_data: Optional[List[dict]]
+    meta_data: List[dict] = []
     
     def to_dict(self):
         return {
