@@ -4,7 +4,7 @@ import re
 import json
 from app.core.config import RunConfig
 from app.utils import run_llm, extract_answer
-from app.prompt_list import REASONING_USER_PROMPT, REASONING_SYS_PROMPT, COT_SYS_PROMPT, COT_USER_PROMPT
+from app.prompt_list import REASONING_USER_PROMPT_V2, REASONING_SYS_PROMPT_V2, COT_SYS_PROMPT, COT_USER_PROMPT
 from app.core.models import PathResult, Branch
 
 logger = logging.getLogger("app.adapters.llm")
@@ -58,14 +58,11 @@ class LLMReasoner(Reasoner):
         # 2) Serialize to the "Knowledge Triplets" text your prompts expect
         triplets_text = _format_branches_for_llm(branches)
 
-        # 3) Build a tiny shim object exposing .format_for_llm() so we can call your legacy function unchanged
-        walker_shim = _WalkerShim(triplets_text)
-
-        # 4) Call your existing reasoning(...)
+        # 3) Call your existing reasoning(...)
         logger.info(f"reasoning start: branches={len(branches)}", extra={"session_key": session_key})
         
-        sys_prompt = REASONING_SYS_PROMPT
-        user_prompt = REASONING_USER_PROMPT % (main_q, walker_shim.format_for_llm())
+        sys_prompt = REASONING_SYS_PROMPT_V2
+        user_prompt = REASONING_USER_PROMPT_V2 % (main_q, triplets_text)
         
         logger.debug(f'reasoning user_prompt:\n{user_prompt}', extra={'session_key': session_key})
         response = run_llm(
@@ -107,14 +104,3 @@ def _format_branches_for_llm(branches: List[Branch]) -> str:
             lines.append(f"{s} --{r}--> {t}")
         lines.append("")  # blank line
     return "\n".join(lines)
-
-
-class _WalkerShim:
-    """
-    Minimal shim with the same .format_for_llm() method your legacy 'reasoning' expects.
-    """
-    def __init__(self, text: str):
-        self._text = text
-
-    def format_for_llm(self) -> str:
-        return self._text
