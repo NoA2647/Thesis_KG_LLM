@@ -48,17 +48,19 @@ class LLMPruning(Pruner):
         if not current_node.qid or not pairs:
             return [Hop(current_node, rel, ce, 0.0) for rel, ce in pairs]
         
-        hops = relation_entity_search_prune(main_q=main_q,
-                                 sub_question=current_sq,
-                                 previous_sub_questions=previous_sqs,
-                                 purpose=purpose,
-                                 initial_node=initial_node,
-                                 current_node=current_node,
-                                 previous_hops=previous_hops,
-                                 relation_entity_pairs=pairs,
-                                 configs=self.cfg,
-                                 llm_logger=logger,
-                                 session_key=session_key)
+        hops = relation_entity_search_prune(
+            main_q=main_q,
+            sub_question=current_sq,
+            previous_sub_questions=previous_sqs,
+            purpose=purpose,
+            initial_node=initial_node,
+            current_node=current_node,
+            previous_hops=previous_hops,
+            relation_entity_pairs=pairs,
+            configs=self.cfg,
+            llm_logger=logger,
+            session_key=session_key
+        )
         logger.debug(f"LLM pruning applied; hops={len(hops)}", extra={"session_key": session_key})
 
         return hops
