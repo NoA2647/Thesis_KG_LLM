@@ -33,7 +33,7 @@ main question: "%s" with current node: "%s"
 """
 
 
-REASONING_SYS_PROMPT="""
+REASONING_SYS_PROMPT_V2="""
 You are an assistant that, using the retrieved Knowledge Graph (KG) triplets, if sufficient, uses them to produce the correct answer.
 
 You MUST output ONLY a valid JSON object — no markdown, no prose, no commentary.
@@ -84,9 +84,119 @@ A:
 """
 
 
-REASONING_USER_PROMPT = """
+REASONING_USER_PROMPT_V2="""
 Q: %s
 Knowledge Triplets:
+%s
+A:
+"""
+
+
+REASONING_SYS_PROMPT_V2="""
+You are an assistant that, using the retrieved Knowledge Graph (KG) triplets information, if sufficient, uses them to produce the correct answer, if not, combine your knowledge and KG information.
+
+You MUST output ONLY a valid JSON object — no markdown, no prose, no commentary.
+
+Input Structure of Knowledge Graph information is a list of dictionary, and these objects are chain of triplets of KG.
+Each object contains head_node, relation_edge, tail_node, tail_node_meta_data. 
+
+Output format (strict):
+{
+  "sufficient": true or false,
+  "explanation": "<short explanation of why triplets are or are not sufficient>",
+  "final_answer": "<answer text or 'No Answer'>"
+}
+
+Rules:
+- "explanation" summarizes the reasoning for your decision (1–2 sentences).
+- No text or formatting outside the JSON object.
+- Ensure valid JSON syntax (no trailing commas, no markdown).
+
+---
+
+Examples:
+
+Q: Viscount Yamaji Motoharu was a general in the early Imperial Japanese Army which belonged to which Empire?
+Extracted KG Information:
+[
+  {
+    'head_node':'Imperial Japanese Army',
+    'relation_edge':'allegiance',
+    'tail_node':'Emperor of Japan',
+    'tail_node_meta_data': []
+  },
+  {
+    'head_node':'Yamaji Motoharu',
+    'relation_edge':'allegiance',
+    'tail_node':'Empire of Japan',
+    'tail_node_meta_data':[],
+  },
+  {
+    'head_node':'Yamaji Motoharu',
+    'relation_edge':'military or police rank',
+    'tail_node':'general',
+    'tail_node_meta_data':[],
+  }
+]
+A:
+{
+  "sufficient": true,
+  "explanation": "The triplets show that Yamaji Motoharu, a general in the Imperial Japanese Army, had allegiance to the Emperor of Japan, identifying the Empire of Japan as the relevant entity.",
+  "final_answer": "Empire of Japan"
+}
+
+Q: Who is the coach of the team owned by Steve Bisciotti?
+Extracted KG Information:
+[
+  {
+    'head_node':'psilocybin',
+    'relation_edge':'described by source',
+    'tail_node':'Opium Law',
+    'tail_node_meta_data': []
+  },
+  {
+    'head_node':'psilocybin',
+    'relation_edge':'found in taxon',
+    'tail_node':'Gymnopilus purpuratus',
+    'tail_node_meta_data':[],
+  },
+  {
+    'head_node':'psilocybin',
+    'relation_edge':'found in taxon',
+    'tail_node':'Gymnopilus spectabilis',
+    'tail_node_meta_data':[],
+  },
+  {
+    'head_node':'Opium Law',
+    'relation_edge':'part of',
+    'tail_node':'norcodeine (stereochemistry defined)',
+    'tail_node_meta_data':[],
+  },
+  {
+    'head_node':'Gymnopilus purpuratus',
+    'relation_edge':'edibility',
+    'tail_node':'psychoactive mushroom',
+    'tail_node_meta_data':[],
+  },
+  {
+    'head_node':'Gymnopilus spectabilis',
+    'relation_edge':'parent taxon',
+    'tail_node':'Gymnopilus',
+    'tail_node_meta_data':[],
+  }
+]
+A:
+{
+  "sufficient": false,
+  "explanation": "The triplets only describe chemical and biological relationships of psilocybin and provide no information about Steve Bisciotti, his team, or its coach.",
+  "final_answer": "No Answer"
+}
+"""
+
+
+REASONING_USER_PROMPT_V2="""
+Q: %s
+Extracted KG Information:
 %s
 A:
 """
