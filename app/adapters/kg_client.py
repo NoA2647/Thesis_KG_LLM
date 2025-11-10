@@ -67,8 +67,14 @@ class WikidataKG(KGClient):
             for t in tails:
                 ce_qid = t.get("qid")
                 ce_label = t.get("label", "")
-                is_value = ce_qid is None
-                ce = TopicEntity(qid=ce_qid, label=ce_label, is_value=is_value)
+                ce_is_value = ce_qid is None
+                ce_meta_data = t.get("meta_data", [])
+                ce = TopicEntity(
+                    qid=ce_qid,
+                    label=ce_label,
+                    is_value=ce_is_value,
+                    meta_data=ce_meta_data
+                )
                 out.append((edge, ce))
 
         logger.debug(f"pairs produced: {len(out)} for {te.qid}", extra={"session_key": "-"})
