@@ -93,17 +93,17 @@ A:
 
 
 REASONING_SYS_PROMPT_V2="""
-You are an assistant that, using the retrieved Knowledge Graph (KG) triplets information, if sufficient, uses them to produce the correct answer, if not, combine your knowledge and KG information.
+You are an assistant that, using the retrieved Knowledge Graph (KG) triplets information and your knowledge answer the question, if the KG was sufficient, uses them to produce the correct answer, if not, combine your knowledge and KG information and asnswer the question.
 
 You MUST output ONLY a valid JSON object — no markdown, no prose, no commentary.
 
-Input Structure of Knowledge Graph information is a list of dictionary, and these objects are chain of triplets of KG.
+Input Structure of KG information is a list of dictionary, and these objects are chain of triplets of KG.
 Each object contains head_node, relation_edge, tail_node, tail_node_meta_data. 
 
 Output format (strict):
 {
-  "sufficient": true or false,
-  "explanation": "<short explanation of why triplets are or are not sufficient>",
+  "sufficient": <Is KG's information enough or not (true or false)>,
+  "explanation": "<short explanation of why KG'information are or are not sufficient>",
   "final_answer": "<answer text or 'No Answer'>"
 }
 
@@ -265,15 +265,18 @@ Q: %s
 EXTRACT_RELATION_ENTITY_SYS_PROMPT = """
 You are an information extraction engine navigating a knowledge graph (KG).
 
-At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs.
+At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs with their meta data.
 You also know:
 - The MAIN question being answered.
-- The INITIAL node where reasoning began.
-- The sub-questions already traversed in this reasoning path.
+- The INITIAL node is the first node that we start to walk.
+- The sub-questions which are already traversed in this reasoning path.
 - The PURPOSE of the current sub-question you are solving.
 
-Your goal is to select the most relevant relation–entity pairs for progressing toward the MAIN question,
+Your goal is to select the most relevant relation–entity pairs for progressing toward the MAIN question ans score selected pair,
 while avoiding revisiting any entities already explored in the traversal path.
+
+"score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance) but attation that if the probability of the items was the same but the sum wasn't 1.0, give them equal score.
+for example if the three item had the same score, give them all three of them 0.33, not two of them 0.33 and the last one 0.34.
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
@@ -283,15 +286,6 @@ Output format (strict):
   {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
   {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0}
 ]
-
-Rules:
-- Output exactly the requested number of items (no more, no less).
-- "relation" and "entity" MUST come verbatim from the provided list.
-- Do NOT select any entity that appears in the list of already visited nodes.
-- Each "sentences" field must clearly connect this hop to the PURPOSE of the current sub-question,
-  and explain how it helps progress toward answering the MAIN question about the INITIAL node (max 2 sentences).
-- "score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance).
-- No text, markdown, or commentary outside the JSON array.
 """
 
 
@@ -301,26 +295,27 @@ You are currently WALKING on a Knowledge Graph (KG).
 MAIN question:
 "%s"
 
-INITIAL node (starting entity of reasoning):
+INITIAL node:
 "%s"
 
 You have walked through these sub-questions so far:
 %s
 
+You have already visited these nodes:
+%s
+
+And now you are at node **"%s"**.
+
+Your task is to look at all outgoing relation–entity pairs from this node
+and select exactly %s pairs that are most helpful for advancing toward the MAIN question.
+
+The CURRENT sub-question is:
+%s
+
 The purpose of the CURRENT sub-question is:
 "%s"
 
-You are now **at node "%s"**, and you have already visited these nodes:
-%s
-
-Your task is to look at all outgoing relation–entity pairs from this node
-and select exactly %s pairs that are most helpful for advancing toward the MAIN question
-and fulfilling the PURPOSE of the current sub-question.
-
-The current sub-question is:
-%s
-
-Relation–Entity pairs from the current node:
+Relation–Entity pairs with their meta data from the CURRENT node:
 %s
 
 Select exactly %s items following the JSON schema given in the system message.
