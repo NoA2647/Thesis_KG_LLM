@@ -14,7 +14,7 @@ class TopicEntity:
     qid: Optional[str]
     label: str
     is_value: bool = False
-    meta_data: List[dict] = []
+    meta_data: List[dict] = field(default_factory=list)
     
     def to_dict(self):
         return {
