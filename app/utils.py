@@ -1,10 +1,13 @@
 from app.prompt_list import *
 import json
+import tempfile
+import os
+from pathlib import Path
 import time
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Iterable
 
 
 def clean_relations(string, entity_id):
@@ -98,15 +101,51 @@ def clean_scores(string, entity_candidates):
         return [1/len(entity_candidates)] * len(entity_candidates)
     
 
-def save_2_json(data_id, question, results, paths, file_name):
+def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], file_name: str = "results") -> None:
+    """
+    Append one payload into a single JSON array file: ToG_{file_name}.json
+    Writes atomically (safe replace). Not ideal for extremely large files.
+    """
+    out_path = Path(f"ToG_{file_name}.json")
     payload = {
         "id": data_id,
         "question": question,
         "answer": results,
-        "paths": [p.to_dict() for p in paths],
+        "paths": [p.to_dict() if hasattr(p, "to_dict") else p for p in paths],
     }
-    with open(f"ToG_{file_name}.json", "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    # Load existing array if present and valid, else start fresh
+    if out_path.exists():
+        try:
+            with out_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                # If file exists but is not a list, start a fresh list (or choose to raise)
+                data = []
+        except (json.JSONDecodeError, OSError):
+            # If file is corrupted / unreadable, start fresh (you can log a warning here)
+            data = []
+    else:
+        data = []
+
+    data.append(payload)
+
+    # Write atomically: write to a temp file in the same dir then replace
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix=out_path.stem, suffix=".tmp", dir=str(out_path.parent))
+    try:
+        # fdopen with encoding ensures text mode and proper encoding
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as tmpf:
+            json.dump(data, tmpf, ensure_ascii=False, indent=2)
+            tmpf.flush()
+            os.fsync(tmpf.fileno())
+        os.replace(tmp_path, str(out_path))
+    finally:
+        # Cleanup stray temp file in case of unexpected failure
+        if Path(tmp_path).exists():
+            try:
+                Path(tmp_path).unlink()
+            except Exception:
+                pass
 
 
 def extract_answer(text: str) -> Optional[Dict[str, Any]]:
