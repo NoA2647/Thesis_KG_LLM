@@ -11,7 +11,7 @@ from app.path_search.branch_expander import BranchExpander
 from app.path_search.selectors import BranchSelector
 from app.path_search.engine import PathSearchEngine
 from app.path_search.pipeline import PathPipeline
-
+from tqdm import tqdm
 from app.adapters.Data_collection import WikiDataC_v2
 from app.utils import prepare_dataset, save_2_json
 
@@ -47,7 +47,7 @@ def main():
 
     # 4) iterate questions (example: run for one row like your old code)
     #    you can wrap this in argparse to pick indices/limits.
-    for idx, row in enumerate(data_rows[19:20]):
+    for idx, row in enumerate(tqdm(data_rows, total=len(data_rows))):
         main_q = row[question_key]
         data_id = row[id_key]
         # initial topic entities: dict of {qid: label}
