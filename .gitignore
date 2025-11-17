@@ -108,4 +108,5 @@ env/
 test.ipynb
 
 Graph/
-ToG_cwq.json
+ToG_cwq*
+runs/
