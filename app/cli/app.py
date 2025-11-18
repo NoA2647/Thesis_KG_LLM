@@ -47,9 +47,9 @@ def main():
 
     # 4) iterate questions (example: run for one row like your old code)
     #    you can wrap this in argparse to pick indices/limits.
-    for idx, row in enumerate(tqdm(data_rows, total=len(data_rows))):
+    for idx, row in enumerate(tqdm(data_rows[:5], total=len(data_rows[:5]))):
         main_q = row[question_key]
-        data_id = row[id_key]
+        data_id = row.get(id_key, f'{main_q}_{idx}')
         # initial topic entities: dict of {qid: label}
         initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
         if not initial_map:
