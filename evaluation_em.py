@@ -1,212 +1,162 @@
+import json
+import re
+import statistics
 
-import json, re, unicodedata, os, csv
-from typing import Dict, Any, List
-from collections import Counter
+# ---------------------------
+# Configuration for relaxed matching
+# ---------------------------
+IGNORE_WORDS = ["language", "dialect", "people", "official", "spoken", "the", "of", "and"]
 
-GENERIC_SUFFIXES = {"language", "state", "system", "world series"}
+def normalize(text):
+    """Lowercase, remove punctuation, and ignore common words."""
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)  # remove punctuation
+    for w in IGNORE_WORDS:
+        text = re.sub(r"\b" + re.escape(w) + r"\b", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
-def normalize(s: str) -> str:
-    if s is None:
-        return ""
-    s = str(s)
-    s = s.lower()
-    s = unicodedata.normalize("NFKD", s)
-    s = re.sub(r'\b(a|an|the)\b', ' ', s)
-    s = re.sub(r'[^\w\s]', ' ', s)
-    s = re.sub(r'\s+', ' ', s).strip()
-    return s
-
-def tokenize(s: str) -> List[str]:
-    return normalize(s).split()
-
-def to_canonical_list(text: str) -> List[str]:
-    if text is None:
-        return []
-    raw = str(text)
-    if "," in raw:
-        parts = [p.strip() for p in raw.split(",")]
-    elif re.search(r'\band\b', raw, flags=re.I):
-        parts = [p.strip() for p in re.split(r'\band\b', raw, flags=re.I)]
-    else:
-        parts = [raw.strip()]
-    out, seen = [], set()
-    for p in parts:
-        n = normalize(p)
-        if n and n not in seen:
-            seen.add(n)
-            out.append(n)
-    return out
-
-def strip_generic_suffixes(text: str) -> str:
-    t = normalize(text)
-    for suf in GENERIC_SUFFIXES:
-        if t.endswith(" " + suf):
-            t = t[: -len(suf)-1].strip()
-    return t
-
-def f1_score(prediction: str, ground_truth: str) -> float:
-    pred_toks = tokenize(prediction)
-    gold_toks = tokenize(ground_truth)
-    common = Counter(pred_toks) & Counter(gold_toks)
-    num_same = sum(common.values())
-    if len(pred_toks) == 0 or len(gold_toks) == 0:
-        return float(pred_toks == gold_toks)
-    if num_same == 0:
-        return 0.0
-    precision = 1.0 * num_same / len(pred_toks)
-    recall = 1.0 * num_same / len(gold_toks)
-    return 2 * precision * recall / (precision + recall)
-
-def exact_match(prediction: str, ground_truth: str) -> int:
-    return int(normalize(prediction) == normalize(ground_truth))
-
-def year_only(s: str) -> str:
-    import re
-    m = re.search(r'\b(18|19|20)\d{2}\b', s or "")
-    return m.group(0) if m else ""
-
-def is_no_answer(pred: str) -> bool:
-    p = normalize(pred)
-    return p in {"", "no answer", "none", "n a", "unknown", "not found", "noanswer", "null"}
-
-def load_predictions(path: str) -> Dict[str, str]:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    mapping = {}
-    for ex in data:
-        pid = ex.get("id") or ex.get("ID") or ex.get("Id")
-        ans_obj = ex.get("answer", {})
-        pred_text = None
-        try:
-            pred_text = ans_obj.get("answer", {}).get("final_answer")
-        except AttributeError:
-            pred_text = None
-        if not pred_text:
-            a = ans_obj.get("answer")
-            if isinstance(a, (str, int, float)):
-                pred_text = str(a)
-            elif isinstance(a, dict) and "answer" in a and isinstance(a["answer"], str):
-                pred_text = a["answer"]
-        if pred_text is None:
-            pred_text = ""
-        mapping[str(pid)] = str(pred_text)
-    return mapping
-
-def load_dataset(path: str) -> Dict[str, str]:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    mapping = {}
-    for ex in data:
-        did = ex.get("ID") or ex.get("id")
-        gold = ex.get("answer", "")
-        mapping[str(did)] = str(gold)
-    return mapping
-
-def list_overlap_metrics(pred: str, gold: str):
-    pred_list = to_canonical_list(pred)
-    gold_list = to_canonical_list(gold)
-    if len(pred_list) >= 2 or len(gold_list) >= 2:
-        pred_set = set(pred_list)
-        gold_set = set(gold_list)
-        tp = len(pred_set & gold_set)
-        prec = tp / max(1, len(pred_set))
-        rec = tp / max(1, len(gold_set))
-        f1 = 0.0 if (prec + rec) == 0 else 2*prec*rec/(prec+rec)
-        return tp, prec, rec, f1, pred_list, gold_list
-    return 0, 0.0, 0.0, 0.0, pred_list, gold_list
-
-def contains_gold_item(pred: str, gold: str) -> bool:
-    pred_list = to_canonical_list(pred)
-    gold_list = to_canonical_list(gold)
-    if len(gold_list) == 1 and len(pred_list) >= 1:
-        return gold_list[0] in set(pred_list) or strip_generic_suffixes(gold_list[0]) in set(pred_list)
-    if len(pred_list) == 1 and len(gold_list) >= 1:
-        return pred_list[0] in set(gold_list) or pred_list[0] == strip_generic_suffixes(gold_list[0])
+def is_relaxed_match(pred, truths):
+    """Return True if any truth matches prediction in a relaxed way."""
+    pred_norm = normalize(pred)
+    for truth in truths:
+        truth_norm = normalize(truth)
+        if truth_norm in pred_norm or pred_norm in truth_norm:
+            return True
     return False
 
-def classify(pred: str, gold: str):
-    if is_no_answer(pred):
-        return "NO_ANSWER", "prediction marked as no-answer", {}
-    em = exact_match(pred, gold)
-    f1 = f1_score(pred, gold)
-    ypred, ygold = year_only(pred), year_only(gold)
-    year_em = (ypred != "" and ygold != "" and ypred == ygold)
-    tp, lprec, lrec, lf1, pred_list, gold_list = list_overlap_metrics(pred, gold)
-    cg = contains_gold_item(pred, gold)
+# ---------------------------
+# Load predictions and dataset
+# ---------------------------
+with open("./ToG_webquestions.json", "r", encoding="utf-8") as f:
+    predictions = json.load(f)
 
-    if em or year_em or f1 >= 0.85 or cg:
-        return "CORRECT", f"em={em}, year_em={year_em}, f1={round(f1,3)}, contains_gold={cg}", {
-            "EM": em, "F1": round(f1,3), "YearEM": year_em, "ListTP": tp, "ListF1": round(lf1,3)
-        }
-    if f1 >= 0.5 or lf1 >= 0.5 or (tp > 0):
-        return "PARTIAL", f"f1={round(f1,3)}, list_f1={round(lf1,3)}, list_tp={tp}", {
-            "EM": em, "F1": round(f1,3), "YearEM": year_em, "ListTP": tp, "ListF1": round(lf1,3)
-        }
-    return "WRONG", f"low overlap: f1={round(f1,3)}, list_f1={round(lf1,3)}", {
-        "EM": em, "F1": round(f1,3), "YearEM": year_em, "ListTP": tp, "ListF1": round(lf1,3)
+with open("./data/WebQuestions.json", "r", encoding="utf-8") as f:
+    dataset = json.load(f)
+
+# Map dataset by question for easy lookup
+dataset_map = {item["question"]: item["answers"] for item in dataset}
+
+# ---------------------------
+# Step 1: Evaluate predictions
+# ---------------------------
+results = []
+correct_count = 0
+
+for pred in predictions:
+    question = pred["question"]
+    pred_answer = pred["answer"]["answer"]["final_answer"]
+    true_answers = dataset_map.get(question, [])
+    
+    correct = is_relaxed_match(pred_answer, true_answers)
+    if correct:
+        correct_count += 1
+    
+    results.append({
+        "question": question,
+        "prediction": pred_answer,
+        "true_answers": true_answers,
+        "correct": correct
+    })
+
+total_questions = len(predictions)
+accuracy = correct_count / total_questions * 100
+
+print(f"\n--- Step 1: Prediction Evaluation ---")
+print(f"Total questions: {total_questions}")
+print(f"Correct predictions: {correct_count}")
+print(f"Accuracy: {accuracy:.2f}%")
+
+# Save detailed results
+with open("evaluation_results.json", "w", encoding="utf-8") as f:
+    json.dump(results, f, indent=2, ensure_ascii=False)
+
+# ---------------------------
+# Step 2: Subquestions analysis
+# ---------------------------
+subq_stats = []
+all_subq_counts = []
+
+for pred in predictions:
+    question = pred["question"]
+    paths = pred.get("paths", [])
+    
+    path_subq_counts = [len(path.get("subqs", [])) for path in paths]
+    
+    if path_subq_counts:
+        max_subq = max(path_subq_counts)
+        min_subq = min(path_subq_counts)
+        avg_subq = sum(path_subq_counts) / len(path_subq_counts)
+    else:
+        max_subq = min_subq = avg_subq = 0
+    
+    subq_stats.append({
+        "question": question,
+        "path_subq_counts": path_subq_counts,
+        "max_subq": max_subq,
+        "min_subq": min_subq,
+        "avg_subq": avg_subq
+    })
+    
+    all_subq_counts.extend(path_subq_counts)
+
+# Overall subquestion statistics
+if all_subq_counts:
+    overall_avg_subq = sum(all_subq_counts) / len(all_subq_counts)
+    overall_median_subq = statistics.median(all_subq_counts)
+    overall_min_subq = min(all_subq_counts)
+    overall_max_subq = max(all_subq_counts)
+else:
+    overall_avg_subq = overall_median_subq = overall_min_subq = overall_max_subq = 0
+
+print(f"\n--- Step 2: Subquestions Analysis ---")
+print(f"Average subquestions per path: {overall_avg_subq:.2f}")
+print(f"Median subquestions per path: {overall_median_subq}")
+print(f"Min subquestions per path: {overall_min_subq}")
+print(f"Max subquestions per path: {overall_max_subq}")
+
+with open("subquestions_stats.json", "w", encoding="utf-8") as f:
+    json.dump(subq_stats, f, indent=2, ensure_ascii=False)
+
+# ---------------------------
+# Step 3: Estimated time analysis
+# ---------------------------
+llm_times = []
+wiki_times = []
+total_times = []
+
+for pred in predictions:
+    est = pred.get("estimate_time", {})
+    llm_times.append(est.get("est_llm", 0))
+    wiki_times.append(est.get("est_wiki", 0))
+    total_times.append(est.get("est_total", 0))
+
+def compute_stats(times_list, label):
+    if times_list:
+        avg = sum(times_list) / len(times_list)
+        med = statistics.median(times_list)
+        min_time = min(times_list)
+        max_time = max(times_list)
+    else:
+        avg = med = min_time = max_time = 0
+    print(f"{label} Times (s): Avg={avg:.2f}, Median={med:.2f}, Min={min_time:.2f}, Max={max_time:.2f}")
+
+print(f"\n--- Step 3: Estimated Time Analysis ---")
+compute_stats(llm_times, "LLM")
+compute_stats(wiki_times, "Wiki")
+compute_stats(total_times, "Total")
+
+per_question_times = [
+    {
+        "question": pred["question"],
+        "est_llm": pred.get("estimate_time", {}).get("est_llm", 0),
+        "est_wiki": pred.get("estimate_time", {}).get("est_wiki", 0),
+        "est_total": pred.get("estimate_time", {}).get("est_total", 0)
     }
+    for pred in predictions
+]
 
-def evaluate(pred_path: str, gold_path: str, out_dir: str):
-    os.makedirs(out_dir, exist_ok=True)
-    preds = load_predictions(pred_path)
-    golds = load_dataset(gold_path)
+with open("estimated_times.json", "w", encoding="utf-8") as f:
+    json.dump(per_question_times, f, indent=2, ensure_ascii=False)
 
-    ids = sorted(set(golds.keys()) & set(preds.keys()))
-    missing_pred = sorted(set(golds.keys()) - set(preds.keys()))
-    missing_gold = sorted(set(preds.keys()) - set(golds.keys()))
-
-    counters = Counter()
-    detailed = []
-
-    for i in ids:
-        p = preds[i]
-        g = golds[i]
-        label, reason, feats = classify(p, g)
-        counters[label] += 1
-        detailed.append({
-            "id": i,
-            "label": label,
-            "reason": reason,
-            "prediction": p,
-            "gold": g,
-            **feats
-        })
-
-    totals = sum(counters.values()) or 1
-    metrics = {
-        "num_examples": totals,
-        "counts": dict(counters),
-        "ratios": {k: v / totals for k, v in counters.items()},
-        "missing_predictions": len(missing_pred),
-        "pred_without_gold": len(missing_gold)
-    }
-
-    with open(os.path.join(out_dir, "metrics.json"), "w", encoding="utf-8") as f:
-        json.dump(metrics, f, ensure_ascii=False, indent=2)
-
-    with open(os.path.join(out_dir, "detailed.tsv"), "w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f, delimiter="\t")
-        w.writerow(["id","label","reason","EM","F1","YearEM","ListTP","ListF1","prediction","gold"])
-        for r in detailed:
-            w.writerow([r["id"], r["label"], r["reason"], r.get("EM",""), r.get("F1",""), r.get("YearEM",""),
-                        r.get("ListTP",""), r.get("ListF1",""), r["prediction"], r["gold"]])
-
-    with open(os.path.join(out_dir, "missing_pred_ids.txt"), "w", encoding="utf-8") as f:
-        for mid in missing_pred:
-            f.write(mid + "\n")
-    with open(os.path.join(out_dir, "pred_without_gold_ids.txt"), "w", encoding="utf-8") as f:
-        for mid in missing_gold:
-            f.write(mid + "\n")
-
-    print(json.dumps(metrics, indent=2))
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--pred", required=True)
-    parser.add_argument("--gold", required=True)
-    parser.add_argument("--out", default="cwq_eval_plus_run")
-    args = parser.parse_args()
-    evaluate(args.pred, args.gold, args.out)
-
-# python evaluate_cwq.py --pred ToG_cwq.json --gold ./data/cwq.json --out runs/cwq
+print("\nAll results saved to JSON files: evaluation_results.json, subquestions_stats.json, estimated_times.json")
