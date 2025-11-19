@@ -106,7 +106,24 @@ class SubQuestion:
             "question": self.question,
             "purpose": self.purpose,
         }
-    
+
+@dataclass(slots=True)
+class EstimateTime:
+    """
+    Estimate times of processes
+    """
+
+    est_llm:float = 0.0
+    est_wiki:float = 0.0
+    est_total:float = 0.0
+
+    def to_dict(self):
+        return {
+            "est_llm": self.est_llm,
+            "est_wiki": self.est_wiki,
+            "est_total": self.est_total
+        }
+        
 @dataclass(slots=True)
 class PathResult:
     """
