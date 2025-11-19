@@ -4,9 +4,10 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 import matplotlib.patches as mpatches
+from pathlib import Path
 
-def build_and_draw_graph(data: json, save_path: str = None, figsize: tuple = (12, 8),
-                         show: bool = True, node_distance: float = 2.0) -> nx.DiGraph:
+def build_and_draw_graph(data:dict, save_path:str = None, figsize:tuple = (12, 8),
+                         show:bool = False, node_distance:float = 2.0) -> nx.DiGraph:
     """
     Build a directed graph from `data['paths']` and draw it.
     - Nodes: label = node label
@@ -15,9 +16,14 @@ def build_and_draw_graph(data: json, save_path: str = None, figsize: tuple = (12
     - Paths are visually separated
     Returns: networkx.DiGraph
     """
-    if not data.get("paths"):
-        print("No paths found in JSON. Nothing to draw.")
-        return None
+    IMAGE_DIR = Path("images")
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    save_path = save_path.replace('?', '')
+    save_path = save_path.replace(':', '')
+    save_path = save_path.replace('/', '')
+    save_path = save_path.replace('>', '')
+    save_path = save_path.replace('<', '')
+    save_path = IMAGE_DIR / f'{save_path}'
 
     G = nx.DiGraph()
     path_node_map = defaultdict(set)
@@ -157,7 +163,6 @@ def build_and_draw_graph(data: json, save_path: str = None, figsize: tuple = (12
 
     if save_path:
         plt.savefig(save_path, dpi=200, bbox_inches="tight")
-        print(f"Graph saved to: {save_path}")
 
     if show:
         plt.show()
