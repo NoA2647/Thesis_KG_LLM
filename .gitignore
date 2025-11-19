@@ -108,6 +108,6 @@ env/
 test.ipynb
 
 Graph/
-ToG_cwq*
+ToG_*
 runs/
 images/
