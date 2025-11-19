@@ -5,6 +5,7 @@ from app.core.models import RelationEdge, TopicEntity
 from app.core.errors import KGError
 from app.adapters.Data_collection import WikiDataC_v2
 from app.wiki_func import abandon_rels
+import time
 
 logger = logging.getLogger("app.adapters.kg")
 
@@ -12,7 +13,7 @@ class KGClient:
     """
     Interface for retrieving (RelationEdge, CandidateEntity) pairs from a frontier TE.
     """
-    def relations(self, te: TopicEntity) -> List[Tuple[RelationEdge, TopicEntity]]:
+    def relations(self, te: TopicEntity) -> tuple[List[Tuple[RelationEdge, TopicEntity]],float] :
         raise NotImplementedError
 
 
@@ -30,10 +31,11 @@ class WikidataKG(KGClient):
         self.wiki = wiki
         self.cfg = cfg
 
-    def relations(self, te: TopicEntity) -> List[Tuple[RelationEdge, TopicEntity]]:
+    def relations(self, te: TopicEntity) -> tuple[List[Tuple[RelationEdge, TopicEntity]],float]:
+        start_time = time.time()
         if not te.qid:
             logger.debug("frontier is a literal; no outgoing relations")
-            return []
+            return [], 0.0
 
         try:
             rels = self.wiki.get_all_relations_of_an_entity(te.qid)  # [{pid,label}]
@@ -78,4 +80,6 @@ class WikidataKG(KGClient):
                 out.append((edge, ce))
 
         logger.debug(f"pairs produced: {len(out)} for {te.qid}")
-        return out
+        end_time = time.time()
+        rel_est_time = end_time - start_time
+        return out, rel_est_time

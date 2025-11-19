@@ -6,6 +6,7 @@ from app.core.config import RunConfig
 from app.utils import run_llm, extract_answer
 from app.prompt_list import REASONING_USER_PROMPT_V2, REASONING_SYS_PROMPT_V2, COT_SYS_PROMPT, COT_USER_PROMPT
 from app.core.models import PathResult, Branch
+import time
 
 logger = logging.getLogger("app.adapters.llm")
 
@@ -13,7 +14,7 @@ class Reasoner:
     """
     Interface for final reasoning over all path results.
     """
-    def reason(self, main_q: str, results: List[PathResult]) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult]) -> tuple[Dict, float]:
         raise NotImplementedError
 
 
@@ -26,7 +27,8 @@ class LLMReasoner(Reasoner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def cot(self, main_q: str) -> Dict:
+    def cot(self, main_q: str) -> tuple[Dict, float]:
+        start_time = time.time()
         logger.info(f"COT start")
         sys_prompt = COT_SYS_PROMPT
         user_prompt = COT_USER_PROMPT % main_q
@@ -44,13 +46,16 @@ class LLMReasoner(Reasoner):
         answer = json.loads(response)
         logger.debug(f'extract_answer:\n{answer}')
         logger.info("COT done")
+        end_time = time.time()
+        cot_est_time:float = end_time - start_time
         return {
             "answer": {"ok": True, "answer": answer['final_answer']},
             "paths": []
-            }
+            }, cot_est_time
     
-    def reason(self, main_q: str, results: List[PathResult]) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult]) -> tuple[Dict, float]:
         # 1) Gather all branches across paths
+        start_time = time.time()
         branches: List[Branch] = []
         for pr in results:
             branches.extend(pr.final_branches)
@@ -84,7 +89,9 @@ class LLMReasoner(Reasoner):
             answer = None
         
         logger.info("reasoning done")
-        return {"ok": bool(ok), "answer": answer}
+        end_time = time.time()
+        reasoning_est_time:float = end_time - start_time
+        return {"ok": bool(ok), "answer": answer}, reasoning_est_time
 
 # --- helpers --- #
 

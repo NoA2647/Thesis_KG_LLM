@@ -8,7 +8,7 @@ from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 import re
 from typing import Optional, Dict, Any, Iterable
-
+from app.core.models import EstimateTime
 
 def clean_relations(string, entity_id):
     pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
@@ -101,7 +101,7 @@ def clean_scores(string, entity_candidates):
         return [1/len(entity_candidates)] * len(entity_candidates)
     
 
-def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], file_name: str = "results") -> None:
+def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], est_time:EstimateTime, file_name: str = "results") -> None:
     """
     Append one payload into a single JSON array file: ToG_{file_name}.json
     Writes atomically (safe replace). Not ideal for extremely large files.
@@ -112,6 +112,7 @@ def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any],
         "question": question,
         "answer": results,
         "paths": [p.to_dict() if hasattr(p, "to_dict") else p for p in paths],
+        "estimate_time": est_time.to_dict()
     }
 
     # Load existing array if present and valid, else start fresh
@@ -146,6 +147,8 @@ def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any],
                 Path(tmp_path).unlink()
             except Exception:
                 pass
+            
+    return payload
 
 
 def extract_answer(text: str) -> Optional[Dict[str, Any]]:

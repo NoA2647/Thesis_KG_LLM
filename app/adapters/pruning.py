@@ -3,6 +3,7 @@ import logging
 from app.core.models import TopicEntity, RelationEdge, Hop
 from app.wiki_func import relation_entity_search_prune
 from app.core.config import RunConfig
+import time
 
 logger = logging.getLogger("app.adapters.pruning")
 
@@ -20,7 +21,7 @@ class Pruner:
         current_node: TopicEntity,
         previous_hops: List[Hop],
         pairs: List[Tuple[RelationEdge, TopicEntity]]
-    ) -> List[Hop]:
+    ) -> tuple[List[Hop], float]:
         raise NotImplementedError
 
 
@@ -41,11 +42,11 @@ class LLMPruning(Pruner):
         current_node: TopicEntity,
         previous_hops: List[Hop],
         pairs: List[Tuple[RelationEdge, TopicEntity]]
-    ) -> List[Hop]:
+    ) -> tuple[List[Hop], float]:
 
         if not current_node.qid or not pairs:
-            return [Hop(current_node, rel, ce, 0.0) for rel, ce in pairs]
-        
+            return [Hop(current_node, rel, ce, 0.0) for rel, ce in pairs], 0.0
+        start_time = time.time()
         hops = relation_entity_search_prune(
             main_q=main_q,
             sub_question=current_sq,
@@ -59,5 +60,6 @@ class LLMPruning(Pruner):
             llm_logger=logger
         )
         logger.debug(f"LLM pruning applied; hops={len(hops)}")
-
-        return hops
+        end_time = time.time()
+        pruning_est_time = end_time - start_time
+        return hops, pruning_est_time
