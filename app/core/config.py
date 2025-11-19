@@ -31,7 +31,7 @@ class RunConfig:
     max_length: int = 1024
 
     # Dataset name
-    dataset: str = 'cwq'
+    dataset: str = 'webquestions'
 
     # Misc
     rng_seed: Optional[str] = None
