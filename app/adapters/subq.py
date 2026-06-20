@@ -35,7 +35,7 @@ class LLMSubQGenerator(SubQGenerator):
             result = run_llm(user_prompt=user_prompt,
                             temperature=self.cfg.temperature_exploration,
                             max_tokens=self.cfg.max_length,
-                            openai_api_keys=self.cfg.openai_api_key,
+                            api_keys=self.cfg.api_key,
                             sys_prompt=BREAK_QUESTION_SYS_PROMPT,
                             engine=self.cfg.llm_type)
             logger.debug(f'Raw results:\n{result}')

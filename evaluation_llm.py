@@ -12,10 +12,10 @@ MAX_RETRIES = 3
 SLEEP_BETWEEN_RETRIES = 1.5
 RESULTS_DIR = Path("runs/llm")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise RuntimeError("Set OPENAI_API_KEY environment variable before running.")
-openai.api_key = OPENAI_API_KEY
+API_KEY = os.getenv("API_KEY")
+if not API_KEY:
+    raise RuntimeError("Set API_KEY environment variable before running.")
+openai.api_key = API_KEY
 
 # Helper: normalize input item to have candidate_answer
 def extract_candidate_answer(item: Dict[str, Any]) -> str:

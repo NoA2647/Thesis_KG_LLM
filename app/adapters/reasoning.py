@@ -37,7 +37,7 @@ class LLMReasoner(Reasoner):
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
             max_tokens=self.cfg.max_length,
-            openai_api_keys=self.cfg.openai_api_key,
+            api_keys=self.cfg.api_key,
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
@@ -74,7 +74,7 @@ class LLMReasoner(Reasoner):
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
             max_tokens=self.cfg.max_length,
-            openai_api_keys=self.cfg.openai_api_key,
+            api_keys=self.cfg.api_key,
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
