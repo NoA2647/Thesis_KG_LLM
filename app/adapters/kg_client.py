@@ -30,19 +30,24 @@ class WikidataKG(KGClient):
     def __init__(self, wiki: WikiDataC_v2, cfg: RunConfig):
         self.wiki = wiki
         self.cfg = cfg
+        self.attempt = 3
 
     def relations(self, te: TopicEntity) -> tuple[List[Tuple[RelationEdge, TopicEntity]],float]:
         start_time = time.time()
         if not te.qid:
             logger.debug("frontier is a literal; no outgoing relations")
             return [], 0.0
-
-        try:
-            rels = self.wiki.get_all_relations_of_an_entity(te.qid)  # [{pid,label}]
-            logger.debug(f"relations fetched: {len(rels)} for {te.label}({te.qid})")
-        except Exception as e:
-            logger.error(f"get_all_relations failed for {te.label}({te.qid}): {e}")
-            raise KGError(str(e)) from e
+        for i in range(self.attempt):
+            try:
+                rels = self.wiki.get_all_relations_of_an_entity(te.qid)  # [{pid,label}]
+                logger.debug(f"relations fetched: {len(rels)} for {te.label}({te.qid})")
+                break
+            except Exception as e:
+                if i != self.attempt - 1:
+                    time.sleep(5)
+                    continue
+                logger.error(f"get_all_relations failed for {te.label}({te.qid}): {e}")
+                raise KGError(str(e)) from e
 
         # optional removal of noisy/unhelpful relations
         if self.cfg.remove_unnecessary_rel:

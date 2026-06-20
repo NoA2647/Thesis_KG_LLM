@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import time
 from openai import OpenAI
+from cerebras.cloud.sdk import Cerebras
 from openai.types.chat import ChatCompletionMessageParam
 import re
 from typing import Optional, Dict, Any, Iterable
@@ -38,7 +39,7 @@ def run_llm(
     user_prompt: str,
     temperature: float,
     max_tokens: int,
-    openai_api_keys: str,
+    api_keys: str,
     sys_prompt: str = "You are an AI assistant that helps people find information.",
     engine: str = "llama3",
     frequency_penalty: float = 0.0,
@@ -46,15 +47,20 @@ def run_llm(
     retries: int = 3,
     retry_delay: int = 2
 ) -> str:
-    
+    # sleep for cerebras api, limit 5 request per min
+    # time.sleep(15)
     if "llama" in engine.lower():
         client = OpenAI(
             base_url='http://localhost:11434/v1',
             api_key='EMPTY',
         )
+    elif "gpt-oss-120b" == engine:
+        client = Cerebras(
+            api_key=api_keys
+        )
     else:
         client = OpenAI(
-            api_key=openai_api_keys,
+            api_key=api_keys,
         )
 
     messages: list[ChatCompletionMessageParam]= [

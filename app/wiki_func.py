@@ -146,7 +146,7 @@ def relation_entity_search_prune(main_q: str,
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
-                     openai_api_keys=configs.openai_api_key,
+                     api_keys=configs.api_key,
                      engine=configs.llm_type,
                      sys_prompt=EXTRACT_RELATION_ENTITY_SYS_PROMPT)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}')
@@ -160,7 +160,7 @@ def break_question(question: str, entity_name: str, configs: RunConfig, llm_logg
     result = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
-                     openai_api_keys=configs.openai_api_key,
+                     api_keys=configs.api_key,
                      sys_prompt=BREAK_QUESTION_SYS_PROMPT,
                      engine=configs.llm_type)
     llm_logger.debug(f'Raw results:\n{result}')
