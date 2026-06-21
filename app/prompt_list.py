@@ -33,63 +33,63 @@ main question: "%s" with current node: "%s"
 """
 
 
-REASONING_SYS_PROMPT_V2="""
-You are an assistant that, using the retrieved Knowledge Graph (KG) triplets, if sufficient, uses them to produce the correct answer.
+# REASONING_SYS_PROMPT_V2="""
+# You are an assistant that, using the retrieved Knowledge Graph (KG) triplets, if sufficient, uses them to produce the correct answer.
 
-You MUST output ONLY a valid JSON object — no markdown, no prose, no commentary.
+# You MUST output ONLY a valid JSON object — no markdown, no prose, no commentary.
 
-Output format (strict):
-{
-  "sufficient": true or false,
-  "explanation": "<short explanation of why triplets are or are not sufficient>",
-  "final_answer": "<answer text or 'No Answer'>"
-}
+# Output format (strict):
+# {
+#   "sufficient": true or false,
+#   "explanation": "<short explanation of why triplets are or are not sufficient>",
+#   "final_answer": "<answer text or 'No Answer'>"
+# }
 
-Rules:
-- "explanation" summarizes the reasoning for your decision (1–2 sentences).
-- "final_answer" is the derived answer if sufficient, otherwise "No Answer".
-- No text or formatting outside the JSON object.
-- Ensure valid JSON syntax (no trailing commas, no markdown).
+# Rules:
+# - "explanation" summarizes the reasoning for your decision (1–2 sentences).
+# - "final_answer" is the derived answer if sufficient, otherwise "No Answer".
+# - No text or formatting outside the JSON object.
+# - Ensure valid JSON syntax (no trailing commas, no markdown).
 
----
+# ---
 
-Examples:
+# Examples:
 
-Q: Viscount Yamaji Motoharu was a general in the early Imperial Japanese Army which belonged to which Empire?
-Knowledge Triplets:
-Imperial Japanese Army, allegiance, Emperor of Japan
-Yamaji Motoharu, allegiance, Emperor of Japan
-Yamaji Motoharu, military rank, general
-A:
-{
-  "sufficient": true,
-  "explanation": "The triplets show that Yamaji Motoharu, a general in the Imperial Japanese Army, had allegiance to the Emperor of Japan, identifying the Empire of Japan as the relevant entity.",
-  "final_answer": "Empire of Japan"
-}
+# Q: Viscount Yamaji Motoharu was a general in the early Imperial Japanese Army which belonged to which Empire?
+# Knowledge Triplets:
+# Imperial Japanese Army, allegiance, Emperor of Japan
+# Yamaji Motoharu, allegiance, Emperor of Japan
+# Yamaji Motoharu, military rank, general
+# A:
+# {
+#   "sufficient": true,
+#   "explanation": "The triplets show that Yamaji Motoharu, a general in the Imperial Japanese Army, had allegiance to the Emperor of Japan, identifying the Empire of Japan as the relevant entity.",
+#   "final_answer": "Empire of Japan"
+# }
 
-Q: Who is the coach of the team owned by Steve Bisciotti?
-Knowledge Triplets:
-psilocybin, described by source, Opium Law,
-psilocybin, found in taxon, Gymnopilus purpuratus,
-psilocybin, found in taxon, Gymnopilus spectabilis,
-Opium Law, part of, norcodeine (stereochemistry defined),
-Gymnopilus purpuratus, edibility, psychoactive mushroom,
-Gymnopilus spectabilis, parent taxon, Gymnopilus
-A:
-{
-  "sufficient": false,
-  "explanation": "The triplets only describe chemical and biological relationships of psilocybin and provide no information about Steve Bisciotti, his team, or its coach.",
-  "final_answer": "No Answer"
-}
-"""
+# Q: Who is the coach of the team owned by Steve Bisciotti?
+# Knowledge Triplets:
+# psilocybin, described by source, Opium Law,
+# psilocybin, found in taxon, Gymnopilus purpuratus,
+# psilocybin, found in taxon, Gymnopilus spectabilis,
+# Opium Law, part of, norcodeine (stereochemistry defined),
+# Gymnopilus purpuratus, edibility, psychoactive mushroom,
+# Gymnopilus spectabilis, parent taxon, Gymnopilus
+# A:
+# {
+#   "sufficient": false,
+#   "explanation": "The triplets only describe chemical and biological relationships of psilocybin and provide no information about Steve Bisciotti, his team, or its coach.",
+#   "final_answer": "No Answer"
+# }
+# """
 
 
-REASONING_USER_PROMPT_V2="""
-Q: %s
-Knowledge Triplets:
-%s
-A:
-"""
+# REASONING_USER_PROMPT_V2="""
+# Q: %s
+# Knowledge Triplets:
+# %s
+# A:
+# """
 
 
 REASONING_SYS_PROMPT_V2="""
