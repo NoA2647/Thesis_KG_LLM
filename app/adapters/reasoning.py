@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import logging
 import re
 import json
@@ -95,19 +95,78 @@ class LLMReasoner(Reasoner):
 
 # --- helpers --- #
 
-def _format_branches_for_llm(branches: List[Branch]) -> str:
+
+def _format_triplet_dict(t: Dict, indent: str = "  ") -> str:
     """
-    Produce the same style of "Knowledge Triplets" text your walker.format_for_llm() returns.
-    We group by branch and print each hop 'TE --REL--> CE'.
+    Render a single triplet dict in the same literal style used by the
+    few-shot examples in REASONING_SYS_PROMPT_V2:
+
+        {
+          'head_node':'...',
+          'relation_edge':'...',
+          'tail_node':'...',
+          'tail_node_meta_data': [...]
+        }
     """
-    lines: List[str] = []
-    for i, br in enumerate(branches, start=1):
-        lines.append(f"Path {i}:")
+    return (
+        f"{indent}{{\n"
+        f"{indent}  'head_node':{t['head_node']!r},\n"
+        f"{indent}  'relation_edge':{t['relation_edge']!r},\n"
+        f"{indent}  'tail_node':{t['tail_node']!r},\n"
+        f"{indent}  'tail_node_meta_data':{t['tail_node_meta_data']!r}\n"
+        f"{indent}}}"
+    )
+
+
+def _format_branches_for_llm(branches: List["Branch"], dedupe: bool = True) -> str:
+    """
+    Flatten all hops across all branches into a single list of triplet dicts
+    formatted to match REASONING_SYS_PROMPT_V2's few-shot style:
+
+        [
+          {
+            'head_node':'Imperial Japanese Army',
+            'relation_edge':'allegiance',
+            'tail_node':'Emperor of Japan',
+            'tail_node_meta_data': []
+          },
+          ...
+        ]
+
+    Notes:
+    - No "Path i:" grouping — the examples show one flat triplet list, so we
+      match that rather than the old per-branch arrow format.
+    - tail_node_meta_data comes from hop.target.meta_data (TopicEntity has no
+      separate head-side meta_data field used in the prompt design).
+    - dedupe=True drops identical (head, relation, tail) triplets that recur
+      across overlapping branches/paths, since the walker often re-derives
+      the same hop from multiple starting points — keeps the prompt shorter
+      and avoids implying repeated/contradictory evidence.
+    """
+    triplets: List[Dict] = []
+    seen: set[Tuple[str, str, str]] = set()
+
+    for br in branches:
         for hop in br.history:
-            # ensure labels are strings without newlines
-            s = hop.source.label.replace("\n", " ")
-            r = hop.relation.label.replace("\n", " ")
-            t = hop.target.label.replace("\n", " ")
-            lines.append(f"{s} --{r}--> {t}")
-        lines.append("")  # blank line
-    return "\n".join(lines)
+            head = hop.source.label.replace("\n", " ").strip()
+            rel = hop.relation.label.replace("\n", " ").strip()
+            tail = hop.target.label.replace("\n", " ").strip()
+            meta = hop.target.meta_data or []
+
+            key = (head, rel, tail)
+            if dedupe and key in seen:
+                continue
+            seen.add(key)
+
+            triplets.append({
+                "head_node": head,
+                "relation_edge": rel,
+                "tail_node": tail,
+                "tail_node_meta_data": meta,
+            })
+
+    if not triplets:
+        return "[]"
+
+    blocks = [_format_triplet_dict(t) for t in triplets]
+    return "[\n" + ",\n".join(blocks) + "\n]"
