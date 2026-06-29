@@ -25,7 +25,7 @@ class RunConfig:
 
     # LLM / API
     api_key: str = os.getenv("API_KEY", "")
-    llm_type: str = "gpt-oss-120b"       # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini" or "gpt-oss-120b")
+    llm_type: str = os.getenv("LLM_MODEL", "gpt-4o-mini")      # LLM Type (e.g. "llama" or "gpt-3.5-turbo" or "gpt-4o" or "gpt-4o-mini" or "gpt-oss-120b")
     temperature_exploration: float = 0.0
     temperature_reasoning: float = 0.0
     max_length: int = 4096
