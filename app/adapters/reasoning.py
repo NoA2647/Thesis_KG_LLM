@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import logging
 import re
 import json
@@ -6,6 +6,7 @@ from app.core.config import RunConfig
 from app.utils import run_llm, extract_answer
 from app.prompt_list import REASONING_USER_PROMPT_V2, REASONING_SYS_PROMPT_V2, COT_SYS_PROMPT, COT_USER_PROMPT
 from app.core.models import PathResult, Branch
+import time
 
 logger = logging.getLogger("app.adapters.llm")
 
@@ -13,7 +14,7 @@ class Reasoner:
     """
     Interface for final reasoning over all path results.
     """
-    def reason(self, main_q: str, results: List[PathResult]) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult]) -> tuple[Dict, float]:
         raise NotImplementedError
 
 
@@ -26,7 +27,8 @@ class LLMReasoner(Reasoner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def cot(self, main_q: str) -> Dict:
+    def cot(self, main_q: str) -> tuple[Dict, float]:
+        start_time = time.time()
         logger.info(f"COT start")
         sys_prompt = COT_SYS_PROMPT
         user_prompt = COT_USER_PROMPT % main_q
@@ -35,7 +37,7 @@ class LLMReasoner(Reasoner):
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
             max_tokens=self.cfg.max_length,
-            openai_api_keys=self.cfg.openai_api_key,
+            api_keys=self.cfg.api_key,
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
@@ -44,13 +46,16 @@ class LLMReasoner(Reasoner):
         answer = json.loads(response)
         logger.debug(f'extract_answer:\n{answer}')
         logger.info("COT done")
+        end_time = time.time()
+        cot_est_time:float = end_time - start_time
         return {
             "answer": {"ok": True, "answer": answer['final_answer']},
             "paths": []
-            }
+            }, cot_est_time
     
-    def reason(self, main_q: str, results: List[PathResult]) -> Dict:
+    def reason(self, main_q: str, results: List[PathResult]) -> tuple[Dict, float]:
         # 1) Gather all branches across paths
+        start_time = time.time()
         branches: List[Branch] = []
         for pr in results:
             branches.extend(pr.final_branches)
@@ -69,7 +74,7 @@ class LLMReasoner(Reasoner):
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
             max_tokens=self.cfg.max_length,
-            openai_api_keys=self.cfg.openai_api_key,
+            api_keys=self.cfg.api_key,
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
@@ -84,23 +89,84 @@ class LLMReasoner(Reasoner):
             answer = None
         
         logger.info("reasoning done")
-        return {"ok": bool(ok), "answer": answer}
+        end_time = time.time()
+        reasoning_est_time:float = end_time - start_time
+        return {"ok": bool(ok), "answer": answer}, reasoning_est_time
 
 # --- helpers --- #
 
-def _format_branches_for_llm(branches: List[Branch]) -> str:
+
+def _format_triplet_dict(t: Dict, indent: str = "  ") -> str:
     """
-    Produce the same style of "Knowledge Triplets" text your walker.format_for_llm() returns.
-    We group by branch and print each hop 'TE --REL--> CE'.
+    Render a single triplet dict in the same literal style used by the
+    few-shot examples in REASONING_SYS_PROMPT_V2:
+
+        {
+          'head_node':'...',
+          'relation_edge':'...',
+          'tail_node':'...',
+          'tail_node_meta_data': [...]
+        }
     """
-    lines: List[str] = []
-    for i, br in enumerate(branches, start=1):
-        lines.append(f"Path {i}:")
+    return (
+        f"{indent}{{\n"
+        f"{indent}  'head_node':{t['head_node']!r},\n"
+        f"{indent}  'relation_edge':{t['relation_edge']!r},\n"
+        f"{indent}  'tail_node':{t['tail_node']!r},\n"
+        f"{indent}  'tail_node_meta_data':{t['tail_node_meta_data']!r}\n"
+        f"{indent}}}"
+    )
+
+
+def _format_branches_for_llm(branches: List["Branch"], dedupe: bool = True) -> str:
+    """
+    Flatten all hops across all branches into a single list of triplet dicts
+    formatted to match REASONING_SYS_PROMPT_V2's few-shot style:
+
+        [
+          {
+            'head_node':'Imperial Japanese Army',
+            'relation_edge':'allegiance',
+            'tail_node':'Emperor of Japan',
+            'tail_node_meta_data': []
+          },
+          ...
+        ]
+
+    Notes:
+    - No "Path i:" grouping — the examples show one flat triplet list, so we
+      match that rather than the old per-branch arrow format.
+    - tail_node_meta_data comes from hop.target.meta_data (TopicEntity has no
+      separate head-side meta_data field used in the prompt design).
+    - dedupe=True drops identical (head, relation, tail) triplets that recur
+      across overlapping branches/paths, since the walker often re-derives
+      the same hop from multiple starting points — keeps the prompt shorter
+      and avoids implying repeated/contradictory evidence.
+    """
+    triplets: List[Dict] = []
+    seen: set[Tuple[str, str, str]] = set()
+
+    for br in branches:
         for hop in br.history:
-            # ensure labels are strings without newlines
-            s = hop.source.label.replace("\n", " ")
-            r = hop.relation.label.replace("\n", " ")
-            t = hop.target.label.replace("\n", " ")
-            lines.append(f"{s} --{r}--> {t}")
-        lines.append("")  # blank line
-    return "\n".join(lines)
+            head = hop.source.label.replace("\n", " ").strip()
+            rel = hop.relation.label.replace("\n", " ").strip()
+            tail = hop.target.label.replace("\n", " ").strip()
+            meta = hop.target.meta_data or []
+
+            key = (head, rel, tail)
+            if dedupe and key in seen:
+                continue
+            seen.add(key)
+
+            triplets.append({
+                "head_node": head,
+                "relation_edge": rel,
+                "tail_node": tail,
+                "tail_node_meta_data": meta,
+            })
+
+    if not triplets:
+        return "[]"
+
+    blocks = [_format_triplet_dict(t) for t in triplets]
+    return "[\n" + ",\n".join(blocks) + "\n]"

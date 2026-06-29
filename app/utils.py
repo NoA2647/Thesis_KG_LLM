@@ -5,10 +5,11 @@ import os
 from pathlib import Path
 import time
 from openai import OpenAI
+from cerebras.cloud.sdk import Cerebras
 from openai.types.chat import ChatCompletionMessageParam
 import re
 from typing import Optional, Dict, Any, Iterable
-
+from app.core.models import EstimateTime
 
 def clean_relations(string, entity_id):
     pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
@@ -38,7 +39,7 @@ def run_llm(
     user_prompt: str,
     temperature: float,
     max_tokens: int,
-    openai_api_keys: str,
+    api_keys: str,
     sys_prompt: str = "You are an AI assistant that helps people find information.",
     engine: str = "llama3",
     frequency_penalty: float = 0.0,
@@ -46,15 +47,20 @@ def run_llm(
     retries: int = 3,
     retry_delay: int = 2
 ) -> str:
-    
+    # sleep for cerebras api, limit 5 request per min
+    # time.sleep(15)
     if "llama" in engine.lower():
         client = OpenAI(
             base_url='http://localhost:11434/v1',
             api_key='EMPTY',
         )
+    elif "gpt-oss-120b" == engine:
+        client = Cerebras(
+            api_key=api_keys
+        )
     else:
         client = OpenAI(
-            api_key=openai_api_keys,
+            api_key=api_keys,
         )
 
     messages: list[ChatCompletionMessageParam]= [
@@ -101,7 +107,7 @@ def clean_scores(string, entity_candidates):
         return [1/len(entity_candidates)] * len(entity_candidates)
     
 
-def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], file_name: str = "results") -> None:
+def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], est_time:EstimateTime, file_name: str = "results") -> None:
     """
     Append one payload into a single JSON array file: ToG_{file_name}.json
     Writes atomically (safe replace). Not ideal for extremely large files.
@@ -112,6 +118,7 @@ def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any],
         "question": question,
         "answer": results,
         "paths": [p.to_dict() if hasattr(p, "to_dict") else p for p in paths],
+        "estimate_time": est_time.to_dict()
     }
 
     # Load existing array if present and valid, else start fresh
@@ -146,6 +153,8 @@ def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any],
                 Path(tmp_path).unlink()
             except Exception:
                 pass
+            
+    return payload
 
 
 def extract_answer(text: str) -> Optional[Dict[str, Any]]:
@@ -212,42 +221,42 @@ def prepare_dataset(dataset_name):
         question_string = 'question'
         id_string = 'ID'
     elif dataset_name == 'webqsp':
-        with open('../data/WebQSP.json',encoding='utf-8') as f:
+        with open('./data/WebQSP.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'RawQuestion'
         id_string = 'QuestionId'
     elif dataset_name == 'grailqa':
-        with open('../data/grailqa.json',encoding='utf-8') as f:
+        with open('./data/grailqa.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
         id_string = None
     elif dataset_name == 'simpleqa':
-        with open('../data/SimpleQA.json',encoding='utf-8') as f:
+        with open('./data/SimpleQA.json',encoding='utf-8') as f:
             datas = json.load(f)    
         question_string = 'question'
         id_string = None
     elif dataset_name == 'qald':
-        with open('../data/qald_10-en.json',encoding='utf-8') as f:
+        with open('./data/qald_10-en.json',encoding='utf-8') as f:
             datas = json.load(f) 
         question_string = 'question'   
         id_string = None
     elif dataset_name == 'webquestions':
-        with open('../data/WebQuestions.json',encoding='utf-8') as f:
+        with open('./data/WebQuestions.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
         id_string = None
     elif dataset_name == 'trex':
-        with open('../data/T-REX.json',encoding='utf-8') as f:
+        with open('./data/T-REX.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'input'    
         id_string = None
     elif dataset_name == 'zeroshotre':
-        with open('../data/Zero_Shot_RE.json',encoding='utf-8') as f:
+        with open('./data/Zero_Shot_RE.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'input'    
         id_string = None
     elif dataset_name == 'creak':
-        with open('../data/creak.json',encoding='utf-8') as f:
+        with open('./data/creak.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'sentence'
         id_string = 'ex_id'
