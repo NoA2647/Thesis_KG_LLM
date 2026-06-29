@@ -73,7 +73,7 @@ def build_and_draw_graph(data:dict, save_path:str = None, figsize:tuple = (12, 8
     fig, ax = plt.subplots(figsize=figsize)
 
     # Colors for paths
-    colors = plt.cm.get_cmap("tab10")
+    colors = plt.colormaps["tab10"]
     path_ids = list(path_node_map.keys())
     path_color_map = {pid: colors(i % 10) for i, pid in enumerate(path_ids)}
 
