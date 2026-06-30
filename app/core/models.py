@@ -108,20 +108,22 @@ class SubQuestion:
         }
 
 @dataclass(slots=True)
-class EstimateTime:
+class Analyzing:
     """
-    Estimate times of processes
+    Extra analyze of processes
     """
 
     est_llm:float = 0.0
     est_wiki:float = 0.0
     est_total:float = 0.0
+    llm_calls:int = 0
 
     def to_dict(self):
         return {
             "est_llm": self.est_llm,
             "est_wiki": self.est_wiki,
-            "est_total": self.est_total
+            "est_total": self.est_total,
+            "llm_calls": self.llm_calls
         }
         
 @dataclass(slots=True)
