@@ -1,6 +1,6 @@
 from typing import List
 import logging
-from app.core.models import Branch, Hop, TopicEntity, RelationEdge, EstimateTime
+from app.core.models import Branch, Hop, TopicEntity, RelationEdge, Analyzing
 from app.core.types import CombineRule
 from app.adapters.kg_client import KGClient
 from app.adapters.pruning import Pruner
@@ -22,22 +22,22 @@ class BranchExpander:
         self.scorer = scorer
         self.combine_rule = combine_rule
 
-    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str) -> tuple[List[Branch], EstimateTime]:
+    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str) -> tuple[List[Branch], Analyzing]:
         """
         Returns a list of new branches produced by taking one hop from `branch.frontier`.
         May return [] if no candidates or on adapter failures (treated as no expansion).
         """
-        run_time:EstimateTime = EstimateTime()
+        run_analyzing:Analyzing = Analyzing()
         frontier: TopicEntity = branch.frontier
         previous_hops: List[Hop] = branch.history
         pairs: List[tuple[RelationEdge, TopicEntity]] 
         relations_est_time:float
         pairs, relations_est_time = self.kg.relations(frontier)
-        run_time.est_wiki += relations_est_time
+        run_analyzing.est_wiki += relations_est_time
         logger.debug(f"expand frontier={frontier.label} pairs={len(pairs)}")
         
         if not pairs:
-            return [], run_time
+            return [], run_analyzing
 
         hops: List[Hop] 
         prune_est_time:float
@@ -51,9 +51,9 @@ class BranchExpander:
             previous_hops=previous_hops,
             pairs=pairs
         )
-        run_time.est_llm += prune_est_time
+        run_analyzing.est_llm += prune_est_time
         if not hops:
-            return [], run_time
+            return [], run_analyzing
 
         out: List[Branch] = []
         for hop in hops:
@@ -62,4 +62,4 @@ class BranchExpander:
             new_history.append(hop)
             out.append(Branch(history=new_history, frontier=hop.target, cum_score=new_cum, alive=True))
         logger.debug(f"expanded branches: {len(out)}")
-        return out, run_time
+        return out, run_analyzing
