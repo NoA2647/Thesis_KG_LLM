@@ -109,10 +109,10 @@ def clean_scores(string, entity_candidates):
 
 def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], analyze:Analyzing, file_name: str = "results") -> None:
     """
-    Append one payload into a single JSON array file: ToG_{file_name}.json
+    Append one payload into a single JSON array file: {file_name}_gold.json
     Writes atomically (safe replace). Not ideal for extremely large files.
     """
-    out_path = Path(f"ToG_{file_name}.json")
+    out_path = Path(f"{file_name}_gold.json")
     payload = {
         "id": data_id,
         "question": question,
