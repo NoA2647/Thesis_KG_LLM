@@ -112,7 +112,7 @@ def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any],
     Append one payload into a single JSON array file: {file_name}_output.json
     Writes atomically (safe replace). Not ideal for extremely large files.
     """
-    out_path = Path(f"{file_name}_output.json")
+    out_path = Path(f"data/{file_name}_output.json")
     payload = {
         "id": data_id,
         "question": question,
