@@ -108,6 +108,7 @@ env/
 test.ipynb
 
 Graph/
-ToG_*
+eval_results/
+*_output.json
 runs/
 images/
