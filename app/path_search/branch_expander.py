@@ -2,8 +2,8 @@ from typing import List
 import logging
 from app.core.models import Branch, Hop, TopicEntity, RelationEdge, Analyzing
 from app.core.types import CombineRule
-from app.adapters.kg_client import KGClient
-from app.adapters.pruning import Pruner
+from app.adapters.kg_client import WikidataKG
+from app.adapters.pruning import LLMPruning
 from app.adapters.scoring import Scorer
 
 logger = logging.getLogger("app.path_search.expander")
@@ -16,32 +16,34 @@ class BranchExpander:
       - Scorer to compute hop_score and update cum_score.
     """
 
-    def __init__(self, kg: KGClient, pruner: Pruner, scorer: Scorer, combine_rule: CombineRule):
+    def __init__(self, kg: WikidataKG, pruner: LLMPruning, scorer: Scorer, combine_rule: CombineRule):
         self.kg = kg
         self.pruner = pruner
         self.scorer = scorer
         self.combine_rule = combine_rule
 
-    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str) -> tuple[List[Branch], Analyzing]:
+    def set_analyzer(self, analyzer: Analyzing):
+        self.analyzer = analyzer
+
+    def expand(self, branch: Branch, initial_node:TopicEntity, main_q:str, previous_sqs:List[str], subq: str, purpose:str) -> List[Branch]:
         """
         Returns a list of new branches produced by taking one hop from `branch.frontier`.
         May return [] if no candidates or on adapter failures (treated as no expansion).
         """
-        run_analyzing:Analyzing = Analyzing()
+        self.pruner.set_analyzer(self.analyzer)
+        self.kg.set_analyzer(self.analyzer)
+
         frontier: TopicEntity = branch.frontier
         previous_hops: List[Hop] = branch.history
         pairs: List[tuple[RelationEdge, TopicEntity]] 
-        relations_est_time:float
-        pairs, relations_est_time = self.kg.relations(frontier)
-        run_analyzing.est_wiki += relations_est_time
+        pairs = self.kg.relations(frontier)
         logger.debug(f"expand frontier={frontier.label} pairs={len(pairs)}")
         
         if not pairs:
-            return [], run_analyzing
+            return []
 
         hops: List[Hop] 
-        prune_est_time:float
-        hops, prune_est_time = self.pruner.prune(
+        hops = self.pruner.prune(
             main_q=main_q,
             current_sq=subq,
             previous_sqs=previous_sqs,
@@ -51,9 +53,8 @@ class BranchExpander:
             previous_hops=previous_hops,
             pairs=pairs
         )
-        run_analyzing.est_llm += prune_est_time
         if not hops:
-            return [], run_analyzing
+            return []
 
         out: List[Branch] = []
         for hop in hops:
@@ -62,4 +63,4 @@ class BranchExpander:
             new_history.append(hop)
             out.append(Branch(history=new_history, frontier=hop.target, cum_score=new_cum, alive=True))
         logger.debug(f"expanded branches: {len(out)}")
-        return out, run_analyzing
+        return out
