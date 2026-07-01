@@ -1,7 +1,7 @@
 from typing import List, Tuple
 import logging
 from app.core.config import RunConfig
-from app.core.models import RelationEdge, TopicEntity
+from app.core.models import Analyzing, RelationEdge, TopicEntity
 from app.core.errors import KGError
 from app.adapters.Data_collection import WikiDataC_v2
 from app.wiki_func import abandon_rels
@@ -31,6 +31,9 @@ class WikidataKG(KGClient):
         self.wiki = wiki
         self.cfg = cfg
         self.attempt = 3
+
+    def set_analyzer(self, analyzer: Analyzing):
+        self.analyzer = analyzer
 
     def relations(self, te: TopicEntity) -> tuple[List[Tuple[RelationEdge, TopicEntity]],float]:
         start_time = time.time()
@@ -86,5 +89,5 @@ class WikidataKG(KGClient):
 
         logger.debug(f"pairs produced: {len(out)} for {te.qid}")
         end_time = time.time()
-        rel_est_time = end_time - start_time
-        return out, rel_est_time
+        self.analyzer.est_wiki += (end_time - start_time)
+        return out

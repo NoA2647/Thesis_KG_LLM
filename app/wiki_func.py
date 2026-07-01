@@ -128,27 +128,30 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig,
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}')
     return relation_entity_pairs
 
-def relation_entity_search_prune(main_q: str,
-                                 sub_question: str,
-                                 previous_sub_questions: List[str],
-                                 purpose: str,
-                                 initial_node: TopicEntity,
-                                 current_node: TopicEntity,
-                                 previous_hops: List[Hop],
-                                 relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
-                                 configs: RunConfig,
-                                 llm_logger
-                                 )-> List[Hop]:
+def relation_entity_search_prune(
+        main_q: str,
+        sub_question: str,
+        previous_sub_questions: List[str],
+        purpose: str,
+        initial_node: TopicEntity,
+        current_node: TopicEntity,
+        previous_hops: List[Hop],
+        relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+        configs: RunConfig,
+        analyzer: Analyzing,
+        llm_logger
+        )-> List[Hop]:
     # Now we prompt the LLM to prune and score these relation-entity pairs
     previous_nodes_label = [node.source.label for node in previous_hops]
     user_prompt = construct_relation_entity_prune_prompt(main_q, sub_question, previous_sub_questions, purpose, initial_node.label, current_node.label, previous_nodes_label, relation_entity_pairs, configs)
     llm_logger.debug(f'Relation-Entity Search Prune User Prompt:\n{user_prompt}')
-    result = run_llm(user_prompt=user_prompt,
+    result, prompt_tokens, completion_tokens = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
                      max_tokens=configs.max_length,
                      api_keys=configs.api_key,
                      engine=configs.llm_type,
                      sys_prompt=EXTRACT_RELATION_ENTITY_SYS_PROMPT)
+    analyzer.add_llm_call(prompt_tokens, completion_tokens)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}')
     # Clean and extract relation-entity pairs with scores
     return clean_relation_entity_pairs(result, current_node, relation_entity_pairs)

@@ -117,13 +117,24 @@ class Analyzing:
     est_wiki:float = 0.0
     est_total:float = 0.0
     llm_calls:int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add_llm_call(self, prompt_tokens: int, completion_tokens: int) -> None:
+        """Record one LLM call and its token usage."""
+        self.llm_calls += 1
+        self.input_tokens += prompt_tokens
+        self.output_tokens += completion_tokens
 
     def to_dict(self):
         return {
             "est_llm": self.est_llm,
             "est_wiki": self.est_wiki,
             "est_total": self.est_total,
-            "llm_calls": self.llm_calls
+            "llm_calls": self.llm_calls,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens
+
         }
         
 @dataclass(slots=True)

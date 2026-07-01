@@ -46,7 +46,7 @@ def run_llm(
     presence_penalty: float = 0.0,
     retries: int = 3,
     retry_delay: int = 2
-) -> str:
+) -> tuple[str, int, int]:
     # sleep for cerebras api, limit 5 request per min
     # time.sleep(15)
     if "llama" in engine.lower():
@@ -78,7 +78,11 @@ def run_llm(
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty
             )
-            return response.choices[0].message.content or ""
+            usage = response.usage
+            content=response.choices[0].message.content or ""
+            prompt_tokens=usage.prompt_tokens if usage else 0
+            completion_tokens=usage.completion_tokens if usage else 0
+            return content, prompt_tokens, completion_tokens
         except Exception as e:
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(retry_delay)
