@@ -4,6 +4,9 @@ from app.utils import *
 from typing import List, Tuple
 from app.core.models import TopicEntity, RelationEdge, Hop
 from app.core.config import RunConfig
+from collections import OrderedDict
+
+
 def transform_relation(relation):
     relation_without_prefix = relation.replace("wiki.relation.", "").replace("_", " ")
     return relation_without_prefix
@@ -73,20 +76,68 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
         
     return scored_hops
 
-
-def construct_relation_entity_prune_prompt(main_question, sub_question, previous_sub_questions, purpose, initial_node, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
-    result = ""
-    idx = 1
-    for pair in relation_entity_pairs:
-        if pair[1].qid != None:
-            meta_text = f"meta data of {pair[1].label.replace(' ', '_')}: {pair[1].meta_data}\n" if len(pair[1].meta_data) != 0 else ""
-            result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n" + meta_text
-            idx += 1
-            
-    previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
-            
-    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_questions, previous_nodes_label, entity_name, configs.beam_width, sub_question, purpose, result, configs.beam_width) 
+def format_meta_compact(meta_data: list, max_keys: int = 5) -> str:
+    """Compact qualifier metadata into '(key:value,key:value)', truncating ISO dates to just the year."""
     
+    _DATE_RE = re.compile(r'^[+-]?(\d{1,4})-\d{2}-\d{2}T')
+    _META_PRIORITY = [
+        "start time", "end time", "point in time", "series ordinal",
+        "replaces", "replaced by", "kinship to subject",
+        "applies to jurisdiction", "location", "for work",
+    ]
+
+    if not meta_data:
+        return ""
+    flat = {}
+    for d in meta_data:
+        for k, v in d.items():
+            flat.setdefault(k, v)
+
+    ordered_keys = [k for k in _META_PRIORITY if k in flat]
+    ordered_keys += [k for k in flat if k not in ordered_keys]
+
+    parts = []
+    for k in ordered_keys[:max_keys]:
+        v = str(flat[k]).replace(" ", "_")
+        m = _DATE_RE.match(v)
+        parts.append(f"{k.replace(' ', '_')}:{m.group(1) if m else v}")
+
+    dropped = len(ordered_keys) - max_keys
+    suffix = f",+{dropped}" if dropped > 0 else ""
+    return f"({','.join(parts)}{suffix})" if parts else ""
+
+def construct_relation_entity_prune_prompt(
+    main_question, sub_question, previous_sub_questions, purpose,
+    initial_node, entity_name, previous_nodes_label,
+    relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+    configs: RunConfig,
+    max_entities_per_relation: int = 12,
+):
+    grouped: "OrderedDict[str, list]" = OrderedDict()
+    for rel, ce in relation_entity_pairs:
+        if ce.qid is None:                 # preserves existing behavior — literals were already excluded
+            continue
+        grouped.setdefault(rel.label, []).append(ce)
+
+    lines = []
+    for idx, (rel_label, entities) in enumerate(grouped.items(), start=1):
+        shown = entities[:max_entities_per_relation]
+        rendered = []
+        for ce in shown:
+            label = ce.label.replace(" ", "_")
+            meta = format_meta_compact(ce.meta_data)
+            rendered.append(f"{label}{meta}")
+        extra = len(entities) - len(shown)
+        extra_note = f", +{extra}_more" if extra > 0 else ""
+        lines.append(f"{idx}. {rel_label.replace(' ', '_')} -- " + ", ".join(rendered) + extra_note)
+
+    result = "\n".join(lines)
+    previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
+
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT % (
+        main_question, initial_node, previous_sub_questions, previous_nodes_label,
+        entity_name, sub_question, purpose, result, configs.beam_width
+    )
     return prompt_str
 
 
@@ -96,8 +147,20 @@ def check_end_word(s):
 
 
 def abandon_rels(relation):
-    useless_relation_list = ["category's main topic", "topic\'s main category", "stack exchange site", 'main subject', 'country of citizenship', "commons category", "commons gallery", "country of origin", "country", "nationality"]
-    if check_end_word(relation) or 'wikidata' in relation.lower() or 'wikimedia' in relation.lower() or relation.lower() in useless_relation_list:
+    useless_relation_list = [
+        "category's main topic", "topic's main category", "stack exchange site",
+        "main subject", "country of citizenship", "commons category", "commons gallery",
+        "country of origin", "country", "nationality",
+        "described by source", "topic has template", "different from",
+        "said to be the same as", "permanent duplicated item",
+        "partially coincident with", "flag", "coat of arms", "emblem",
+        "has list", "artist files at", "archives at",
+    ]
+    prefix_blacklist = ("category for", "category of", "maintained by")
+    rl = relation.lower()
+    if check_end_word(relation) or 'wikidata' in rl or 'wikimedia' in rl:
+        return True
+    if rl in useless_relation_list or rl.startswith(prefix_blacklist):
         return True
     return False
 
