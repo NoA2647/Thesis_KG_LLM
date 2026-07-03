@@ -265,58 +265,73 @@ Q: %s
 EXTRACT_RELATION_ENTITY_SYS_PROMPT = """
 You are an information extraction engine navigating a knowledge graph (KG).
 
-At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs with their meta data.
+At each step you are located at a specific node and receive its outgoing relation-entity pairs,
+grouped by relation, one relation per line:
+
+  <line_number>. <relation_label> -- <entity_1>[(meta)], <entity_2>[(meta)], ... [, +K_more]
+
+Format rules:
+- <relation_label> is the Wikidata property connecting the current node to every entity listed after it
+  on that same line.
+- Each comma-separated entity on a line is a SEPARATE, independent candidate reached via that same
+  relation. Example:
+    "3. sibling -- Robert_F._Kennedy(kinship_to_subject:younger_brother), Ted_Kennedy(kinship_to_subject:younger_brother)"
+  represents two distinct candidate pairs: (sibling, Robert_F._Kennedy) and (sibling, Ted_Kennedy).
+  You may select more than one entity from the same line if both are relevant.
+- "(meta)" after an entity is optional compact qualifier data as key:value pairs separated by commas,
+  e.g. "(start_time:1973,end_time:1983,replaces:Isaac_Nissim)". Years shown for start_time/end_time/
+  point_in_time are already extracted from full ISO timestamps.
+- "+K_more" at the end of a line means K additional entities exist under that relation but are not
+  shown due to space. They are NOT available for selection — only choose from entities explicitly listed.
+
 You also know:
 - The MAIN question being answered.
-- The INITIAL node is the first node that we start to walk.
-- The sub-questions which are already traversed in this reasoning path.
+- The INITIAL node: the first node this reasoning path started from.
+- The sub-questions already traversed in this path.
+- The nodes already visited in this path — avoid re-selecting them as the target entity when a
+  better alternative exists.
 - The PURPOSE of the current sub-question you are solving.
 
-Your goal is to select the most relevant relation–entity pairs for progressing toward the MAIN question ans score selected pair,
-while avoiding revisiting any entities already explored in the traversal path.
+Your task: select the most relevant (relation, entity) pairs for advancing toward the MAIN question,
+and assign each a probability score.
 
-"score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance) but attation that if the probability of the items was the same but the sum wasn't 1.0, give them equal score.
-for example if the three item had the same score, give them all three of them 0.33, not two of them 0.33 and the last one 0.34.
+"score" values are floats in [0,1] whose total sums to 1.0 (+/-0.01 tolerance). If multiple selected
+items are equally relevant, split the score evenly — e.g. three equally relevant items each get 0.33,
+0.33, 0.34 (not 0.33, 0.33, 0.33, which doesn't sum to 1.0, and don't leave one item disproportionately
+higher than equally relevant peers).
+
+When returning your selections, copy each relation_label and entity label EXACTLY as shown on its line
+(including underscores) — do NOT include the "(meta)" suffix or the "+K_more" text in your output.
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
 Output format (strict):
 [
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0}
+  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
+  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
+  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0}
 ]
 """
 
-
 EXTRACT_RELATION_ENTITY_USER_PROMPT = """
-You are currently WALKING on a Knowledge Graph (KG).
-
 MAIN question:
 "%s"
 
 INITIAL node:
 "%s"
 
-You have walked through these sub-questions so far:
+Sub-questions already traversed:
 %s
 
-You have already visited these nodes:
+Nodes already visited:
 %s
 
-And now you are at node **"%s"**.
+Current node: "%s"
+Current sub-question: %s
+Purpose: %s
 
-Your task is to look at all outgoing relation–entity pairs from this node
-and select exactly %s pairs that are most helpful for advancing toward the MAIN question.
-
-The CURRENT sub-question is:
+Candidates from current node:
 %s
 
-The purpose of the CURRENT sub-question is:
-"%s"
-
-Relation–Entity pairs with their meta data from the CURRENT node:
-%s
-
-Select exactly %s items following the JSON schema given in the system message.
+Select exactly %s items per the JSON schema in the system message.
 """
