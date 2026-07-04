@@ -76,7 +76,7 @@ def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: 
         
     return scored_hops
 
-def format_meta_compact(meta_data: list, max_keys: int = 5) -> str:
+def format_meta_compact(meta_data: list) -> str:
     """Compact qualifier metadata into '(key:value,key:value)', truncating ISO dates to just the year."""
     
     _DATE_RE = re.compile(r'^[+-]?(\d{1,4})-\d{2}-\d{2}T')
@@ -97,21 +97,18 @@ def format_meta_compact(meta_data: list, max_keys: int = 5) -> str:
     ordered_keys += [k for k in flat if k not in ordered_keys]
 
     parts = []
-    for k in ordered_keys[:max_keys]:
+    for k in ordered_keys:
         v = str(flat[k]).replace(" ", "_")
         m = _DATE_RE.match(v)
         parts.append(f"{k.replace(' ', '_')}:{m.group(1) if m else v}")
 
-    dropped = len(ordered_keys) - max_keys
-    suffix = f",+{dropped}" if dropped > 0 else ""
-    return f"({','.join(parts)}{suffix})" if parts else ""
+    return f"({','.join(parts)})" if parts else ""
 
 def construct_relation_entity_prune_prompt(
     main_question, sub_question, previous_sub_questions, purpose,
     initial_node, entity_name, previous_nodes_label,
     relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
-    configs: RunConfig,
-    max_entities_per_relation: int = 12,
+    configs: RunConfig
 ):
     grouped: "OrderedDict[str, list]" = OrderedDict()
     for rel, ce in relation_entity_pairs:
@@ -121,15 +118,12 @@ def construct_relation_entity_prune_prompt(
 
     lines = []
     for idx, (rel_label, entities) in enumerate(grouped.items(), start=1):
-        shown = entities[:max_entities_per_relation]
         rendered = []
-        for ce in shown:
+        for ce in entities:
             label = ce.label.replace(" ", "_")
             meta = format_meta_compact(ce.meta_data)
             rendered.append(f"{label}{meta}")
-        extra = len(entities) - len(shown)
-        extra_note = f", +{extra}_more" if extra > 0 else ""
-        lines.append(f"{idx}. {rel_label.replace(' ', '_')} -- " + ", ".join(rendered) + extra_note)
+        lines.append(f"{idx}. {rel_label.replace(' ', '_')} -- " + ", ".join(rendered))
 
     result = "\n".join(lines)
     previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
