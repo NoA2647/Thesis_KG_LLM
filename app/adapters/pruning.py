@@ -1,6 +1,6 @@
 from typing import List, Tuple
 import logging
-from app.core.models import TopicEntity, RelationEdge, Hop
+from app.core.models import Analyzing, TopicEntity, RelationEdge, Hop
 from app.wiki_func import relation_entity_search_prune
 from app.core.config import RunConfig
 import time
@@ -32,6 +32,9 @@ class LLMPruning(Pruner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
     
+    def set_analyzer(self, analyzer: Analyzing):
+        self.analyzer = analyzer
+    
     def prune(
         self,
         main_q: str,
@@ -57,9 +60,10 @@ class LLMPruning(Pruner):
             previous_hops=previous_hops,
             relation_entity_pairs=pairs,
             configs=self.cfg,
+            analyzer=self.analyzer,
             llm_logger=logger
         )
         logger.debug(f"LLM pruning applied; hops={len(hops)}")
         end_time = time.time()
-        pruning_est_time = end_time - start_time
-        return hops, pruning_est_time
+        self.analyzer.est_llm += (end_time - start_time)
+        return hops

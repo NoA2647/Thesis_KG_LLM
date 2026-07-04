@@ -75,9 +75,9 @@ def main():
 
         answer = result["answer"]               # return answer={ok:bool, answer:{"sufficient": answered, "explanation": explanation, "final_answer": answer}}
         path_results = result["paths"]          # list of PathResult
-        est_time = result['estimate_time']
+        analyze = result['analyze']
         try:
-            payload = save_2_json(data_id, question=main_q, results=answer, paths=path_results, est_time=est_time, file_name=cfg.dataset)
+            payload = save_2_json(data_id, question=main_q, results=answer, paths=path_results, analyze=analyze, file_name=cfg.dataset)
             build_and_draw_graph(data=payload, save_path=payload['id'])
             logger.info(f"row_saved idx={idx}, data_id={data_id}")
         except Exception:

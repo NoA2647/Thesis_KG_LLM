@@ -5,7 +5,7 @@ import json
 from app.core.config import RunConfig
 from app.utils import run_llm, extract_answer
 from app.prompt_list import REASONING_USER_PROMPT_V2, REASONING_SYS_PROMPT_V2, COT_SYS_PROMPT, COT_USER_PROMPT
-from app.core.models import PathResult, Branch
+from app.core.models import Analyzing, PathResult, Branch
 import time
 
 logger = logging.getLogger("app.adapters.llm")
@@ -27,13 +27,17 @@ class LLMReasoner(Reasoner):
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
-    def cot(self, main_q: str) -> tuple[Dict, float]:
+    def set_analyzer(self, analyzer: Analyzing):
+        self.analyzer = analyzer
+
+    def cot(self, main_q: str) -> Dict:
+        self.analyzer = Analyzing()
         start_time = time.time()
         logger.info(f"COT start")
         sys_prompt = COT_SYS_PROMPT
         user_prompt = COT_USER_PROMPT % main_q
         logger.debug(f'COT user_prompt:\n{user_prompt}')
-        response = run_llm(
+        response, prompt_tokens, completion_tokens = run_llm(
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
             max_tokens=self.cfg.max_length,
@@ -41,17 +45,18 @@ class LLMReasoner(Reasoner):
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
-        
+        self.analyzer.add_llm_call(prompt_tokens, completion_tokens)
         logger.debug(f'raw result:\n{response}')
         answer = json.loads(response)
         logger.debug(f'extract_answer:\n{answer}')
         logger.info("COT done")
         end_time = time.time()
-        cot_est_time:float = end_time - start_time
+        self.analyzer.est_llm += (end_time - start_time)
         return {
             "answer": {"ok": True, "answer": answer['final_answer']},
-            "paths": []
-            }, cot_est_time
+            "paths": [],
+            "analyze": self.analyzer
+            }
     
     def reason(self, main_q: str, results: List[PathResult]) -> tuple[Dict, float]:
         # 1) Gather all branches across paths
@@ -70,7 +75,7 @@ class LLMReasoner(Reasoner):
         user_prompt = REASONING_USER_PROMPT_V2 % (main_q, triplets_text)
         
         logger.debug(f'reasoning user_prompt:\n{user_prompt}')
-        response = run_llm(
+        response, prompt_tokens, completion_tokens = run_llm(
             user_prompt=user_prompt,
             temperature=self.cfg.temperature_reasoning,
             max_tokens=self.cfg.max_length,
@@ -78,6 +83,7 @@ class LLMReasoner(Reasoner):
             engine=self.cfg.llm_type,
             sys_prompt=sys_prompt
         )
+        self.analyzer.add_llm_call(prompt_tokens, completion_tokens)
         logger.debug(f'raw result:\n{response}')
         result = json.loads(response)
         logger.debug(f'extract_answer:\n{result}')
@@ -90,8 +96,8 @@ class LLMReasoner(Reasoner):
         
         logger.info("reasoning done")
         end_time = time.time()
-        reasoning_est_time:float = end_time - start_time
-        return {"ok": bool(ok), "answer": answer}, reasoning_est_time
+        self.analyzer.est_llm += (end_time - start_time)
+        return {"ok": bool(ok), "answer": answer}
 
 # --- helpers --- #
 

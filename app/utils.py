@@ -9,7 +9,7 @@ from cerebras.cloud.sdk import Cerebras
 from openai.types.chat import ChatCompletionMessageParam
 import re
 from typing import Optional, Dict, Any, Iterable
-from app.core.models import EstimateTime
+from app.core.models import Analyzing
 
 def clean_relations(string, entity_id):
     pattern = r"{\s*(?P<relation>[^()]+)\s+\(Score:\s+(?P<score>[0-9.]+)\)}"
@@ -46,7 +46,7 @@ def run_llm(
     presence_penalty: float = 0.0,
     retries: int = 3,
     retry_delay: int = 2
-) -> str:
+) -> tuple[str, int, int]:
     # sleep for cerebras api, limit 5 request per min
     # time.sleep(15)
     if "llama" in engine.lower():
@@ -78,7 +78,11 @@ def run_llm(
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty
             )
-            return response.choices[0].message.content or ""
+            usage = response.usage
+            content=response.choices[0].message.content or ""
+            prompt_tokens=usage.prompt_tokens if usage else 0
+            completion_tokens=usage.completion_tokens if usage else 0
+            return content, prompt_tokens, completion_tokens
         except Exception as e:
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(retry_delay)
@@ -107,18 +111,18 @@ def clean_scores(string, entity_candidates):
         return [1/len(entity_candidates)] * len(entity_candidates)
     
 
-def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], est_time:EstimateTime, file_name: str = "results") -> None:
+def save_2_json(data_id: str, question: str, results: Any, paths: Iterable[Any], analyze:Analyzing, file_name: str = "results") -> None:
     """
-    Append one payload into a single JSON array file: ToG_{file_name}.json
+    Append one payload into a single JSON array file: {file_name}_output.json
     Writes atomically (safe replace). Not ideal for extremely large files.
     """
-    out_path = Path(f"ToG_{file_name}.json")
+    out_path = Path(f"data/{file_name}_output.json")
     payload = {
         "id": data_id,
         "question": question,
         "answer": results,
         "paths": [p.to_dict() if hasattr(p, "to_dict") else p for p in paths],
-        "estimate_time": est_time.to_dict()
+        "analyze": analyze.to_dict()
     }
 
     # Load existing array if present and valid, else start fresh

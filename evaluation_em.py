@@ -28,7 +28,7 @@ def is_relaxed_match(pred, truths):
 # ---------------------------
 # Load predictions and dataset
 # ---------------------------
-with open("./ToG_webquestions.json", "r", encoding="utf-8") as f:
+with open("data/webquestions_output.json", "r", encoding="utf-8") as f:
     predictions = json.load(f)
 
 with open("./data/WebQuestions.json", "r", encoding="utf-8") as f:
