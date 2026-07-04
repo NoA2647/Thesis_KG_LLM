@@ -65,3 +65,5 @@ def setup_logging(
     logging.getLogger("httpx").setLevel(logging.INFO)
     logging.getLogger("httpcore").setLevel(logging.INFO)
     logging.getLogger("openai").setLevel(logging.INFO)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    logging.getLogger("PIL").setLevel(logging.WARNING)
