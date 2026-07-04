@@ -268,19 +268,20 @@ You are an information extraction engine navigating a knowledge graph (KG).
 At each step you are located at a specific node and receive its outgoing relation-entity pairs,
 grouped by relation, one relation per line:
 
-  <line_number>. <relation_label> -- <entity_1>[(meta)], <entity_2>[(meta)], ...
+  <relation_label> -- #<id> <entity_1>[(meta)], #<id> <entity_2>[(meta)], ...
 
 Format rules:
-- <relation_label> is the Wikidata property connecting the current node to every entity listed after it
-  on that same line.
-- Each comma-separated entity on a line is a SEPARATE, independent candidate reached via that same
-  relation. Example:
-    "3. sibling -- Robert_F._Kennedy(kinship_to_subject:younger_brother), Ted_Kennedy(kinship_to_subject:younger_brother)"
-  represents two distinct candidate pairs: (sibling, Robert_F._Kennedy) and (sibling, Ted_Kennedy).
-  You may select more than one entity from the same line if both are relevant.
-- "(meta)" after an entity is optional compact qualifier data as key:value pairs separated by commas,
-  e.g. "(start_time:1973,end_time:1983,replaces:Isaac_Nissim)". Years shown for start_time/end_time/
-  point_in_time are already extracted from full ISO timestamps.
+- <relation_label> is the Wikidata property connecting the current node to every entity listed after
+  it on that same line.
+- Each "#<id> <entity>" token is a SEPARATE, independently selectable candidate reached via that
+  relation. The number after "#" is a unique candidate id — it is the ONLY thing that identifies
+  this candidate. Two candidates can have the exact same relation and the exact same entity label
+  (e.g. the same office held during two different terms) — in that case their ids are what
+  distinguishes them. Always copy the id exactly as shown.
+- "(meta)" after an entity is optional compact qualifier data as key:value pairs, e.g.
+  "(start_time:1965,end_time:1967)". Use this to disambiguate between duplicate-labeled candidates on
+  the same relation line — e.g. pick the one whose end_time is latest, or whose
+  applies_to_jurisdiction matches the sub-question.
 
 You also know:
 - The MAIN question being answered.
@@ -290,25 +291,26 @@ You also know:
   better alternative exists.
 - The PURPOSE of the current sub-question you are solving.
 
-Your task: select the most relevant (relation, entity) pairs for advancing toward the MAIN question,
-and assign each a probability score.
+Your task: select the most relevant candidates for advancing toward the MAIN question, and assign
+each a probability score.
 
 "score" values are floats in [0,1] whose total sums to 1.0 (+/-0.01 tolerance). If multiple selected
-items are equally relevant, split the score evenly — e.g. three equally relevant items each get 0.33,
-0.33, 0.34 (not 0.33, 0.33, 0.33, which doesn't sum to 1.0, and don't leave one item disproportionately
-higher than equally relevant peers).
-
-When returning your selections, copy each relation_label and entity label EXACTLY as shown on its line
-(including underscores) — do NOT include the "(meta)" suffix in your output.
+candidates are equally relevant, split the score evenly — e.g. three equally relevant candidates each
+get 0.33, 0.33, 0.34 (not 0.33, 0.33, 0.33, which doesn't sum to 1.0, and don't leave one candidate
+disproportionately higher than equally relevant peers).
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
 Output format (strict):
 [
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0}
+  {"id": <candidate_id_as_integer>, "relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
+  {"id": <candidate_id_as_integer>, "relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
+  {"id": <candidate_id_as_integer>, "relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0}
 ]
+
+"id" is REQUIRED and is the only field used to resolve your selection. "relation" and "entity" are
+included only for readability and should match the candidate at that id, but if they don't, the id
+still wins — never invent an id; choose only from ids actually present in the candidate list.
 """
 
 EXTRACT_RELATION_ENTITY_USER_PROMPT = """
@@ -328,8 +330,9 @@ Current node: "%s"
 Current sub-question: %s
 Purpose: %s
 
-Candidates from current node:
+Candidates from current node (select by "#id"):
 %s
 
-Select exactly %s items per the JSON schema in the system message.
+Select exactly %s candidates per the JSON schema in the system message. Copy each "id" exactly as
+shown after "#" — do not renumber or guess.
 """
