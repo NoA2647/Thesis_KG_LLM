@@ -265,58 +265,74 @@ Q: %s
 EXTRACT_RELATION_ENTITY_SYS_PROMPT = """
 You are an information extraction engine navigating a knowledge graph (KG).
 
-At each step, you are located at a specific node and receive a list of its outgoing relation–entity pairs with their meta data.
+At each step you are located at a specific node and receive its outgoing relation-entity pairs,
+grouped by relation, one relation per line:
+
+  <relation_label> -- #<id> <entity_1>[(meta)], #<id> <entity_2>[(meta)], ...
+
+Format rules:
+- <relation_label> is the Wikidata property connecting the current node to every entity listed after
+  it on that same line.
+- Each "#<id> <entity>" token is a SEPARATE, independently selectable candidate reached via that
+  relation. The number after "#" is a unique candidate id — it is the ONLY thing that identifies
+  this candidate. Two candidates can have the exact same relation and the exact same entity label
+  (e.g. the same office held during two different terms) — in that case their ids are what
+  distinguishes them. Always copy the id exactly as shown.
+- "(meta)" after an entity is optional compact qualifier data as key:value pairs, e.g.
+  "(start_time:1965,end_time:1967)". Use this to disambiguate between duplicate-labeled candidates on
+  the same relation line — e.g. pick the one whose end_time is latest, or whose
+  applies_to_jurisdiction matches the sub-question.
+
 You also know:
 - The MAIN question being answered.
-- The INITIAL node is the first node that we start to walk.
-- The sub-questions which are already traversed in this reasoning path.
+- The INITIAL node: the first node this reasoning path started from.
+- The sub-questions already traversed in this path.
+- The nodes already visited in this path — avoid re-selecting them as the target entity when a
+  better alternative exists.
 - The PURPOSE of the current sub-question you are solving.
 
-Your goal is to select the most relevant relation–entity pairs for progressing toward the MAIN question ans score selected pair,
-while avoiding revisiting any entities already explored in the traversal path.
+Your task: select the most relevant candidates for advancing toward the MAIN question, and assign
+each a probability score.
 
-"score" values are floats in [0,1] whose total sums to 1.0 (±0.01 tolerance) but attation that if the probability of the items was the same but the sum wasn't 1.0, give them equal score.
-for example if the three item had the same score, give them all three of them 0.33, not two of them 0.33 and the last one 0.34.
+"score" values are floats in [0,1] whose total sums to 1.0 (+/-0.01 tolerance). If multiple selected
+candidates are equally relevant, split the score evenly — e.g. three equally relevant candidates each
+get 0.33, 0.33, 0.34 (not 0.33, 0.33, 0.33, which doesn't sum to 1.0, and don't leave one candidate
+disproportionately higher than equally relevant peers).
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
 Output format (strict):
 [
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0},
-  {"relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1–2 sentences>", "score": 0.0}
+  {"id": <candidate_id_as_integer>, "relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
+  {"id": <candidate_id_as_integer>, "relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0},
+  {"id": <candidate_id_as_integer>, "relation": "<relation_label>", "entity": "<entity_label>", "sentences": "<1-2 sentences>", "score": 0.0}
 ]
+
+"id" is REQUIRED and is the only field used to resolve your selection. "relation" and "entity" are
+included only for readability and should match the candidate at that id, but if they don't, the id
+still wins — never invent an id; choose only from ids actually present in the candidate list.
 """
 
-
 EXTRACT_RELATION_ENTITY_USER_PROMPT = """
-You are currently WALKING on a Knowledge Graph (KG).
-
 MAIN question:
 "%s"
 
 INITIAL node:
 "%s"
 
-You have walked through these sub-questions so far:
+Sub-questions already traversed:
 %s
 
-You have already visited these nodes:
+Nodes already visited:
 %s
 
-And now you are at node **"%s"**.
+Current node: "%s"
+Current sub-question: %s
+Purpose: %s
 
-Your task is to look at all outgoing relation–entity pairs from this node
-and select exactly %s pairs that are most helpful for advancing toward the MAIN question.
-
-The CURRENT sub-question is:
+Candidates from current node (select by "#id"):
 %s
 
-The purpose of the CURRENT sub-question is:
-"%s"
-
-Relation–Entity pairs with their meta data from the CURRENT node:
-%s
-
-Select exactly %s items following the JSON schema given in the system message.
+Select exactly %s candidates per the JSON schema in the system message. Copy each "id" exactly as
+shown after "#" — do not renumber or guess.
 """

@@ -4,6 +4,9 @@ from app.utils import *
 from typing import List, Tuple
 from app.core.models import TopicEntity, RelationEdge, Hop
 from app.core.config import RunConfig
+from collections import OrderedDict
+
+
 def transform_relation(relation):
     relation_without_prefix = relation.replace("wiki.relation.", "").replace("_", " ")
     return relation_without_prefix
@@ -55,39 +58,96 @@ def clean_te_r_ce_triplets(result, te_r_ce_list):
     return bool(scored_triplets), scored_triplets
 
 
-def clean_relation_entity_pairs(result, te: TopicEntity, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]]) -> List[Hop]:
+def clean_relation_entity_pairs(
+    result: str,
+    te: TopicEntity,
+    id_map: Dict[int, Tuple[RelationEdge, TopicEntity]],
+    llm_logger=None,
+) -> List[Hop]:
     matches = json.loads(result)
     scored_hops: List[Hop] = []
     for match in matches:
-        for pair in relation_entity_pairs:
-            if match['entity'] == pair[1].label.replace(" ","_") and match['relation'] == pair[0].label.replace(" ","_"):
-                scored_hops.append(
-                    Hop(
-                        source=te,
-                        relation=pair[0],
-                        target=pair[1],
-                        hop_score=match['score']
-                    )
-                )
-                break
-        
+        cid = match.get('id')
+        pair: Optional[Tuple[RelationEdge, TopicEntity]] = id_map.get(cid)
+        if pair is None:
+            if llm_logger:
+                llm_logger.warning(f"pruning returned unknown/missing candidate id={cid!r}; skipping: {match}")
+            continue
+        rel, ce = pair
+        scored_hops.append(
+            Hop(source=te, relation=rel, target=ce, hop_score=match.get('score', 0.0))
+        )
     return scored_hops
 
-
-def construct_relation_entity_prune_prompt(main_question, sub_question, previous_sub_questions, purpose, initial_node, entity_name, previous_nodes_label, relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]], configs: RunConfig):
-    result = ""
-    idx = 1
-    for pair in relation_entity_pairs:
-        if pair[1].qid != None:
-            meta_text = f"meta data of {pair[1].label.replace(' ', '_')}: {pair[1].meta_data}\n" if len(pair[1].meta_data) != 0 else ""
-            result += f"{idx}. {pair[0].label.replace(' ', '_')} -- {pair[1].label.replace(' ', '_')}\n" + meta_text
-            idx += 1
-            
-    previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
-            
-    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT %(main_question, initial_node, previous_sub_questions, previous_nodes_label, entity_name, configs.beam_width, sub_question, purpose, result, configs.beam_width) 
+def format_meta_compact(meta_data: list, max_keys: int = 10) -> str:
+    _DATE_RE = re.compile(r'^[+-]?(\d{1,4})-\d{2}-\d{2}T')
+    _META_PRIORITY = [
+        "start time", "end time", "point in time", "series ordinal",
+        "replaces", "replaced by", "kinship to subject",
+        "applies to jurisdiction", "location", "for work",
+    ]
     
-    return prompt_str
+    if not meta_data:
+        return ""
+    flat = {}
+    for d in meta_data:
+        for k, v in d.items():
+            flat.setdefault(k, v)
+    ordered_keys = [k for k in _META_PRIORITY if k in flat]
+    ordered_keys += [k for k in flat if k not in ordered_keys]
+    parts = []
+    for k in ordered_keys[:max_keys]:
+        v = str(flat[k]).replace(" ", "_")
+        m = _DATE_RE.match(v)
+        parts.append(f"{k.replace(' ', '_')}:{m.group(1) if m else v}")
+    dropped = len(ordered_keys) - max_keys
+    suffix = f",+{dropped}" if dropped > 0 else ""
+    return f"({','.join(parts)}{suffix})" if parts else ""
+
+
+def construct_relation_entity_prune_prompt(
+    main_question, sub_question, previous_sub_questions, purpose,
+    initial_node, entity_name, previous_nodes_label,
+    relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+    configs: RunConfig,
+    max_entities_per_relation: int = 30,
+) -> Tuple[str, Dict[int, Tuple[RelationEdge, TopicEntity]]]:
+    """
+    Builds the grouped/compacted candidate prompt AND a map of
+    candidate_id -> (RelationEdge, TopicEntity), so the LLM's selection can be
+    resolved unambiguously even when multiple candidates share the same
+    relation label and entity label (e.g. repeated senate terms).
+    """
+    grouped: "OrderedDict[str, list]" = OrderedDict()
+    for rel, ce in relation_entity_pairs:
+        if ce.qid is None:
+            continue
+        grouped.setdefault(rel.label, []).append((rel, ce))
+
+    lines = []
+    id_map: Dict[int, Tuple[RelationEdge, TopicEntity]] = {}
+    cid = 1
+    for rel_label, pairs in grouped.items():
+        shown = pairs[:max_entities_per_relation]
+        rendered = []
+        for rel, ce in shown:
+            label = ce.label.replace(" ", "_")
+            meta = format_meta_compact(ce.meta_data)
+            rendered.append(f"#{cid} {label}{meta}")
+            id_map[cid] = (rel, ce)
+            cid += 1
+        extra = len(pairs) - len(shown)
+        extra_note = f", +{extra}_more" if extra > 0 else ""
+        lines.append(f"{rel_label.replace(' ', '_')} -- " + ", ".join(rendered) + extra_note)
+
+    result = "\n".join(lines)
+    previous_nodes_label = [label.replace(' ', '_') for label in previous_nodes_label]
+
+    prompt_str = EXTRACT_RELATION_ENTITY_USER_PROMPT % (
+        main_question, initial_node, previous_sub_questions, previous_nodes_label,
+        entity_name, sub_question, purpose, result, configs.beam_width
+    )
+    return prompt_str, id_map
 
 
 def check_end_word(s):
@@ -96,8 +156,19 @@ def check_end_word(s):
 
 
 def abandon_rels(relation):
-    useless_relation_list = ["category's main topic", "topic\'s main category", "stack exchange site", 'main subject', 'country of citizenship', "commons category", "commons gallery", "country of origin", "country", "nationality"]
-    if check_end_word(relation) or 'wikidata' in relation.lower() or 'wikimedia' in relation.lower() or relation.lower() in useless_relation_list:
+    useless_relation_list = [
+        "category's main topic", "topic's main category", "stack exchange site",
+        "main subject", "country of citizenship", "commons category", "commons gallery",
+        "described by source", "topic has template", "different from",
+        "said to be the same as", "permanent duplicated item",
+        "partially coincident with", "flag", "coat of arms", "emblem",
+        "has list", "artist files at", "archives at",
+    ]
+    prefix_blacklist = ("category for", "category of", "maintained by")
+    rl = relation.lower()
+    if check_end_word(relation) or 'wikidata' in rl or 'wikimedia' in rl:
+        return True
+    if rl in useless_relation_list or rl.startswith(prefix_blacklist):
         return True
     return False
 
@@ -128,22 +199,24 @@ def retrieve_relation_entity_pairs(entity_id, pre_relations, configs: RunConfig,
     llm_logger.debug(f'Relation-Entity pair:\n{relation_entity_pairs}')
     return relation_entity_pairs
 
-def relation_entity_search_prune(
-        main_q: str,
-        sub_question: str,
-        previous_sub_questions: List[str],
-        purpose: str,
-        initial_node: TopicEntity,
-        current_node: TopicEntity,
-        previous_hops: List[Hop],
-        relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
-        configs: RunConfig,
-        analyzer: Analyzing,
-        llm_logger
-        )-> List[Hop]:
-    # Now we prompt the LLM to prune and score these relation-entity pairs
+def relation_entity_search_prune(main_q: str,
+                                 sub_question: str,
+                                 previous_sub_questions: List[str],
+                                 purpose: str,
+                                 initial_node: TopicEntity,
+                                 current_node: TopicEntity,
+                                 previous_hops: List[Hop],
+                                 relation_entity_pairs: List[Tuple[RelationEdge, TopicEntity]],
+                                 configs: RunConfig,
+                                 analyzer: Analyzing,
+                                 llm_logger
+                                 ) -> List[Hop]:
     previous_nodes_label = [node.source.label for node in previous_hops]
-    user_prompt = construct_relation_entity_prune_prompt(main_q, sub_question, previous_sub_questions, purpose, initial_node.label, current_node.label, previous_nodes_label, relation_entity_pairs, configs)
+    user_prompt, id_map = construct_relation_entity_prune_prompt(
+        main_q, sub_question, previous_sub_questions, purpose,
+        initial_node.label, current_node.label, previous_nodes_label,
+        relation_entity_pairs, configs
+    )
     llm_logger.debug(f'Relation-Entity Search Prune User Prompt:\n{user_prompt}')
     result, prompt_tokens, completion_tokens = run_llm(user_prompt=user_prompt,
                      temperature=configs.temperature_exploration,
@@ -154,8 +227,7 @@ def relation_entity_search_prune(
     analyzer.add_llm_call(prompt_tokens, completion_tokens)
     llm_logger.debug(f'Relation-Entity Search Prune result:\n{result}')
     # Clean and extract relation-entity pairs with scores
-    return clean_relation_entity_pairs(result, current_node, relation_entity_pairs)
-
+    return clean_relation_entity_pairs(result, current_node, id_map, llm_logger)
 
 def break_question(question: str, entity_name: str, configs: RunConfig, llm_logger):
     user_prompt = BREAK_QUESTION_USER_PROMPT % (question, entity_name)
