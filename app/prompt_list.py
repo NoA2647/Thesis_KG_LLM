@@ -268,7 +268,7 @@ You are an information extraction engine navigating a knowledge graph (KG).
 At each step you are located at a specific node and receive its outgoing relation-entity pairs,
 grouped by relation, one relation per line:
 
-  <line_number>. <relation_label> -- <entity_1>[(meta)], <entity_2>[(meta)], ... [, +K_more]
+  <line_number>. <relation_label> -- <entity_1>[(meta)], <entity_2>[(meta)], ...
 
 Format rules:
 - <relation_label> is the Wikidata property connecting the current node to every entity listed after it
@@ -281,8 +281,6 @@ Format rules:
 - "(meta)" after an entity is optional compact qualifier data as key:value pairs separated by commas,
   e.g. "(start_time:1973,end_time:1983,replaces:Isaac_Nissim)". Years shown for start_time/end_time/
   point_in_time are already extracted from full ISO timestamps.
-- "+K_more" at the end of a line means K additional entities exist under that relation but are not
-  shown due to space. They are NOT available for selection — only choose from entities explicitly listed.
 
 You also know:
 - The MAIN question being answered.
@@ -301,7 +299,7 @@ items are equally relevant, split the score evenly — e.g. three equally releva
 higher than equally relevant peers).
 
 When returning your selections, copy each relation_label and entity label EXACTLY as shown on its line
-(including underscores) — do NOT include the "(meta)" suffix or the "+K_more" text in your output.
+(including underscores) — do NOT include the "(meta)" suffix in your output.
 
 You MUST output ONLY a valid JSON array — no markdown, no prose, no explanations.
 
