@@ -1,3 +1,4 @@
+import json
 import uuid, logging
 from app.logging_config import setup_logging, set_session_key
 from app.core.config import RunConfig
@@ -48,29 +49,26 @@ def main():
 
     # 4) iterate questions
     #    you can wrap this in argparse to pick indices/limits.
+    failed_rows = []
+
     for idx, row in enumerate(tqdm(data_rows, total=len(data_rows))):
         main_q = row[question_key]
         data_id = row.get(id_key, f'{main_q}_{idx}')
-        # initial topic entities: dict of {qid: label}
-        initial_map = row.get("qid_topic_entity", {}) # {"Q9696": "John F. Kennedy"}
+        initial_map = row.get("qid_topic_entity", {})
         if not initial_map:
             logger.warning(f"no_initial_entities row={idx}; COT generating")
             result = reasoner.cot(main_q=main_q)
-        
         else:
             initial_entities = [
                 TopicEntity(qid=qid, label=label, is_value=False)
                 for qid, label in initial_map.items()
             ]
-            
             logger.info(f"row_start idx={idx} initials={len(initial_entities)} qlen={len(main_q)}")
-
-            # 5) run the pipeline (per-path independent beams → reasoning)
             try:
                 result = pipeline.run(main_question=main_q, initial_entities=initial_entities)
-                # result = {"answer": {...}, "paths": [PathResult, ...]}
             except Exception as e:
                 logger.exception(f"pipeline_failed row={idx}, data_id={data_id}")
+                failed_rows.append({"idx": idx, "data_id": data_id, "question": main_q, "error": str(e)})
                 continue
 
         answer = result["answer"]               # return answer={ok:bool, answer:{"sufficient": answered, "explanation": explanation, "final_answer": answer}}
@@ -84,7 +82,10 @@ def main():
             logger.exception(f"save_failed row={idx}, data_id={data_id}")
 
     logger.info("run_done")
-
+    if failed_rows:
+        with open(f"data/failed_rows_{cfg.dataset}.json", "w", encoding="utf-8") as f:
+            json.dump(failed_rows, f, ensure_ascii=False, indent=2)
+        print(f"{len(failed_rows)} rows failed — see failed_rows_{cfg.dataset}.json")
     print("Done.")
 
 if __name__ == "__main__":

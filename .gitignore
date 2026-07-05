@@ -110,5 +110,6 @@ test.ipynb
 Graph/
 eval_results/
 *_output.json
+failed_rows_*.json
 runs/
 images/
