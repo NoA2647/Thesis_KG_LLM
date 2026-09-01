@@ -139,19 +139,18 @@ class Analyzing:
         
 @dataclass(slots=True)
 class PathResult:
-    """
-    Mutable state while searching a single path (for one initial entity).
-    """
-    
     path_id: str
     initial: TopicEntity
     subqs: List[SubQuestion]
     final_branches: List[Branch] = field(default_factory=list)
-    
+    discarded_branches: List[Branch] = field(default_factory=list)  # draw-time only
+
     def to_dict(self):
+        # unchanged on purpose — discarded_branches never reaches the saved JSON
         return {
             "path_id": self.path_id,
             "initial": self.initial.to_dict(),
             "subqs": [sq.to_dict() for sq in self.subqs],
             "final_branches": [b.to_dict() for b in self.final_branches],
         }
+    

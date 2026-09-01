@@ -37,6 +37,7 @@ class PathSearchEngine:
         beam: List[Branch] = [Branch(history=[], frontier=initial, cum_score=0.0, alive=True)]
         prev_nonempty_beam: List[Branch] = beam
         answered_subqs: List[str] = []
+        discarded: List[Branch] = []  # NEW — accumulated across every hop
 
         for step_idx, subq in enumerate(subqs):
             # expand every branch in the current beam
@@ -66,6 +67,7 @@ class PathSearchEngine:
                     initial=initial,
                     subqs=subqs,
                     final_branches=list(prev_nonempty_beam),
+                    discarded_branches=discarded
                 )
 
             # select top-K branches for next step
@@ -73,6 +75,10 @@ class PathSearchEngine:
             if len(next_beam) > self.k:
                 logger.error("selector returned > K branches")
                 raise InvariantError("selector returned more than K branches")
+
+            kept_ids = {id(b) for b in next_beam}  # NEW — identity, not value equality
+            discarded.extend(b for b in pool if id(b) not in kept_ids)
+
             answered_subqs.append(subq.question)
             prev_nonempty_beam = next_beam
             beam = next_beam
@@ -81,7 +87,7 @@ class PathSearchEngine:
         logger.info(f"path_finish id={path_id} final_beam={len(beam)}")
         return PathResult(
             path_id=path_id or f"path_{initial.qid or initial.label}",
-            initial=initial,
-            subqs=subqs,
+            initial=initial, subqs=subqs,
             final_branches=list(beam),
+            discarded_branches=discarded,  # NEW
         )
