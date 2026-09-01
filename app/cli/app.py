@@ -51,7 +51,7 @@ def main():
     #    you can wrap this in argparse to pick indices/limits.
     failed_rows = []
 
-    for idx, row in enumerate(tqdm(data_rows, total=len(data_rows))):
+    for idx, row in enumerate(tqdm(data_rows[2:3], total=len(data_rows[2:3]))):
         main_q = row[question_key]
         data_id = row.get(id_key, f'{main_q}_{idx}')
         initial_map = row.get("qid_topic_entity", {})
@@ -76,7 +76,7 @@ def main():
         analyze = result['analyze']
         try:
             payload = save_2_json(data_id, question=main_q, results=answer, paths=path_results, analyze=analyze, file_name=cfg.dataset)
-            build_and_draw_graph(data=payload, save_path=payload['id'])
+            build_and_draw_graph(data=payload, discarded_paths=path_results, save_path=payload['id'])
             logger.info(f"row_saved idx={idx}, data_id={data_id}")
         except Exception:
             logger.exception(f"save_failed row={idx}, data_id={data_id}")
